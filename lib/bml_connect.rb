@@ -3,6 +3,7 @@
 require_relative "bml_connect/version"
 require_relative "bml_connect/client"
 require "bml_connect/models"
+require "bml_connect/transactions"
 
 module BMLConnect
   class Error < StandardError; end

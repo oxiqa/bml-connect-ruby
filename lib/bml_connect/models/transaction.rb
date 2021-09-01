@@ -17,6 +17,10 @@ module BMLConnect
         #initialize transaction props
         fields.each { |k,v| public_send("#{k}=", v) }
       end
+
+      def to_hash()
+        instance_variables.each_with_object({}) { |var, hash| hash[var.to_s.delete("@")] = instance_variable_get(var) }
+      end
     end
   end
 end
