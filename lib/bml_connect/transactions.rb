@@ -14,6 +14,8 @@ module BMLConnect
 
     def create(params)
       transaction = BMLConnect::Models::Transaction.new(params)
+      # generate signature
+      transaction.sign(@client.api_key)
       @client.post(END_POINT, transaction.to_hash)
     end
 

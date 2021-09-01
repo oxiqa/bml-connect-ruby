@@ -6,6 +6,8 @@ module BMLConnect
   module Models
     class Transaction
 
+      include BMLConnect::Crypt::Signature
+
       REQUIRED_FIELDS = Set[:amount, :currency]
 
       attr_accessor :amount, :currency, :is_preauthorization, :provider, :redirect_url, :local_id, :customer_reference
