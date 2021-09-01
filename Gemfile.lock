@@ -2,6 +2,8 @@ PATH
   remote: .
   specs:
     bml_connect (0.1.0)
+      deep_merge (~> 1.2)
+      faraday (~> 1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -69,10 +71,8 @@ PLATFORMS
 
 DEPENDENCIES
   bml_connect!
-  deep_merge
-  faraday (~> 1.7)
   rake (~> 13.0)
-  rspec (~> 3.0)
+  rspec (~> 3.10.0)
   rubocop (~> 1.7)
 
 BUNDLED WITH
