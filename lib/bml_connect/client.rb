@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'faraday'
 require 'deep_merge/rails_compat'
 
