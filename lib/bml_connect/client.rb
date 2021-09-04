@@ -11,23 +11,18 @@ module BMLConnect
     BML_SANDBOX_ENDPOINT = "https://api.uat.merchants.bankofmaldives.com.mv/public/"
     BML_PRODUCTION_ENDPOINT = "https://api.merchants.bankofmaldives.com.mv/public/"
 
+    attr_reader(:api_key, :http_client, :transactions)
+
     def initialize(api_key: nil, app_id: nil, mode: "production", options: {})
-      @api_key = api_key || defined?(BML_API_KEY) ? BML_API_KEY : 'not-set'
-      @app_id = app_id || defined?(BML_APP_ID) ? BML_APP_ID : 'not-set'
+      @api_key = api_key || (defined?(BML_API_KEY) ? BML_API_KEY : 'not-set')
+      @app_id = app_id || (defined?(BML_APP_ID) ? BML_APP_ID : 'not-set')
       @mode = mode
       @http_client = initialize_http_client(options)
+      @transactions = Transactions.new(self)
     end
 
     def base_url
       @mode == 'production' ? BML_PRODUCTION_ENDPOINT : BML_SANDBOX_ENDPOINT
-    end
-
-    def api_key
-      @api_key
-    end
-
-    def http_client
-      @http_client
     end
 
     def set_http_client(client)
