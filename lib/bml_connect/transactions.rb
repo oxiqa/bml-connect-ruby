@@ -23,7 +23,7 @@ module BMLConnect
       @client.get(END_POINT + "/#{id}")
     end
 
-    def list(params)
+    def list(params = {})
       @client.get(END_POINT, params)
     end
   end
