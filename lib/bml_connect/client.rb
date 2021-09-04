@@ -5,15 +5,17 @@ require 'deep_merge/rails_compat'
 
 module BMLConnect
   class Client
+    BML_API_KEY = 'not-set'
+    BML_APP_ID = 'not-set'
     BML_API_VERSION = '2.0'
     BML_APP_VERSION = 'bml-connect-ruby'
     BML_SIGN_METHOD = 'sha1'
     BML_SANDBOX_ENDPOINT = "https://api.uat.merchants.bankofmaldives.com.mv/public/"
     BML_PRODUCTION_ENDPOINT = "https://api.merchants.bankofmaldives.com.mv/public/"
 
-    def initialize(api_key:, app_id:, mode: "production", options: {})
-      @api_key = api_key
-      @app_id = app_id
+    def initialize(api_key: nil, app_id: nil, mode: "production", options: {})
+      @api_key = api_key || BML_API_KEY
+      @app_id = app_id || BML_APP_ID
       @mode = mode
       @http_client = initialize_http_client(options)
     end
