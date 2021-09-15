@@ -10,7 +10,7 @@ module BMLConnect
 
       REQUIRED_FIELDS = Set[:amount, :currency]
 
-      attr_accessor :amount, :currency, :is_preauthorization, :provider, :redirect_url, :local_id, :customer_reference
+      attr_accessor :amount, :currency, :isPreauthorization, :provider, :redirectUrl, :localId, :customerReference
       
       def initialize(fields)
         # check for required fields
