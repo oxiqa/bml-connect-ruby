@@ -35,6 +35,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rubocop", "~> 1.7"
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_dependency "faraday", "~> 1.0"
+  spec.add_dependency "faraday_middleware", "~> 1.0"
   spec.add_dependency "deep_merge", "~> 1.2"
 
   # For more information and examples about making a new gem, checkout our

@@ -4,6 +4,7 @@ PATH
     bml_connect (0.1.0)
       deep_merge (~> 1.2)
       faraday (~> 1.0)
+      faraday_middleware (~> 1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -30,6 +31,8 @@ GEM
     faraday-net_http_persistent (1.2.0)
     faraday-patron (1.0.0)
     faraday-rack (1.0.0)
+    faraday_middleware (1.1.0)
+      faraday (~> 1.0)
     multipart-post (2.1.1)
     parallel (1.20.1)
     parser (3.0.2.0)
