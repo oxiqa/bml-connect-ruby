@@ -56,7 +56,7 @@ module BMLConnect
       };
       Faraday.new(defaults.deeper_merge!(options)) do |f|
         f.response :logger, nil, { headers: true, bodies: true }
-        f.response :json
+        f.response :json, :parser_options => { :symbolize_names => true }
       end
     end
   end
