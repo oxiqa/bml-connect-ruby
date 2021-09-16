@@ -24,6 +24,53 @@ Or install it yourself as:
 
 ## Usage
 
+First get your API key and App ID from Merchant Portal for [`production`](https://dashboard.merchants.bankofmaldives.com.mv) or [`sandbox`](https://dashboard.uat.merchants.bankofmaldives.com.mv).
+
+For production client:
+```ruby
+require 'bml_connect`
+
+client = BMLConnect::Client.new(api_key: '<your-api-key>', app_id: '<your-app-id>')
+```
+For sandbox client:
+```ruby
+require 'bml_connect`
+
+client = BMLConnect::Client.new(api_key: '<your-api-key>', app_id: '<your-app-id>', mode: 'sandbox')
+```
+In Ruby on Rails, to configure globally, add an intilializer `bml_connect.rb`:
+```ruby
+module BMLConnect
+  class Client
+    BML_API_KEY = ENV['BML_MPG_KEY']
+    BML_APP_ID = ENV['BML_MPG_APP_ID']
+    BML_MODE = ENV['BML_MPG_MODE']
+  end
+end
+````
+```ruby
+client = BMLConnect::Client.new
+```
+### API Operations
+To create a new transaction
+```ruby
+resp = client.transactions.create({
+  amount: 10000,
+  currency: 'MVR',
+  redirectUrl: '<your-redirect-uri>',
+  localId: 'local-1',
+  customerReference: 'INV-0001'
+})
+```
+To fetch a specified transaction
+```ruby
+resp = client.transactions.get(id)
+```
+To transaction list
+```ruby
+resp = client.transactions.list({ page: 2 })
+```
+API responses are instances of [`Faraday::Response`](https://github.com/lostisland/faraday/blob/main/lib/faraday/response.rb) class, `json` encoded with symbolized names. 
 
 ## Development
 
