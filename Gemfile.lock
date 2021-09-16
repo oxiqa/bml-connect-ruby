@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    bml_connect (0.1.0)
+    bml_connect (0.2.0)
       deep_merge (~> 1.2)
       faraday (~> 1.0)
       faraday_middleware (~> 1.0)
