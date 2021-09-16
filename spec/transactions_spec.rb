@@ -24,11 +24,11 @@ RSpec.describe BMLConnect::Transactions do
     data = {
       :amount => 1000,
       :currency => 'USD',
-      :is_preauthorization => false,
+      :isPreauthorization => false,
       :provider => 'visa',
-      :redirect_url => 'https://lvh.me',
-      :local_id => '0000',
-      :customer_reference => 'C0000'
+      :redirectUrl => 'https://lvh.me',
+      :localId => '0000',
+      :customerReference => 'C0000'
     }
     resp = transactions.create(data)
     expect(resp.env.status).to eq(200)

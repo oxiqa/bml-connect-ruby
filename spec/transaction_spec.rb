@@ -11,20 +11,20 @@ RSpec.describe BMLConnect::Models::Transaction do
     data = {
       :amount => 1000,
       :currency => 'USD',
-      :is_preauthorization => false,
+      :isPreauthorization => false,
       :provider => 'visa',
-      :redirect_url => 'https://lvh.me',
-      :local_id => '0000',
-      :customer_reference => 'C0000'
+      :redirectUrl => 'https://lvh.me',
+      :localId => '0000',
+      :customerReference => 'C0000'
     }
 
     transaction = BMLConnect::Models::Transaction.new(data)
     expect(transaction.amount).to eq(data[:amount])
     expect(transaction.currency).to eq(data[:currency])
-    expect(transaction.is_preauthorization).to eq(data[:is_preauthorization])
+    expect(transaction.isPreauthorization).to eq(data[:isPreauthorization])
     expect(transaction.provider).to eq(data[:provider])
-    expect(transaction.redirect_url).to eq(data[:redirect_url])
-    expect(transaction.local_id).to eq(data[:local_id])
-    expect(transaction.customer_reference).to eq(data[:customer_reference])
+    expect(transaction.redirectUrl).to eq(data[:redirectUrl])
+    expect(transaction.localId).to eq(data[:localId])
+    expect(transaction.customerReference).to eq(data[:customerReference])
   end
 end
