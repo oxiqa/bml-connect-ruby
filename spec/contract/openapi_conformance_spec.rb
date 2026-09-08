@@ -29,6 +29,21 @@ RSpec.describe "OpenAPI conformance" do
     end
   end
 
+  describe "paths the Tokens resource can emit" do
+    it "declares the token collection path template" do
+      expect(doc["paths"]).to have_key("/public-customers/{customerId}/tokens")
+    end
+
+    it "declares the single-token path template" do
+      expect(doc["paths"]).to have_key("/public-customers/{customerId}/tokens/{tokenId}")
+    end
+
+    it "ties the resource's PATH constant to the documented collection template" do
+      emitted = format(BMLConnect::Tokens::PATH, customer_id: "{customerId}")
+      expect(doc["paths"]).to have_key(emitted)
+    end
+  end
+
   describe "authentication scheme" do
     let(:scheme) { doc.dig("components", "securitySchemes", "Authorization") }
     let(:client) { build_client }

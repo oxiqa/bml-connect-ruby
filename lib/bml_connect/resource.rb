@@ -74,8 +74,13 @@ module BMLConnect
       end
     end
 
+    # Transient statuses worth retrying (FR-013a): request timeout, rate limit,
+    # and any 5xx. A 429 that survives the retries is still surfaced as a
+    # RateLimitError by map_error, carrying BML's Retry-After hint for the
+    # caller — the internal wait stays governed by the client's bounded backoff,
+    # not by an arbitrary server-supplied delay.
     def retryable_status?(status)
-      status == 408 || (500..599).cover?(status)
+      status == 408 || status == 429 || (500..599).cover?(status)
     end
 
     def backoff(attempts)

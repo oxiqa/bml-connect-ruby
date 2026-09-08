@@ -42,6 +42,12 @@ module BMLConnect
       @customers ||= Customers.new(self)
     end
 
+    # Memoized stored-card tokens resource, bound to this client's mode and
+    # credentials. Read-and-delete only — see BMLConnect::Tokens.
+    def tokens
+      @tokens ||= Tokens.new(self)
+    end
+
     def base_url
       @mode == 'production' ? BML_PRODUCTION_ENDPOINT : BML_SANDBOX_ENDPOINT
     end
