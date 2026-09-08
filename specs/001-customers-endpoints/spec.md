@@ -12,6 +12,23 @@ published contract, `reference/Connect-API.json` (OpenAPI 3.1, Connect API v2.0)
 
 ## Clarifications
 
+### Session 2026-09-08
+
+- Q: Should the library validate email *format*, or only presence/non-empty? → A: Presence plus a
+  lightweight shape check. `email` (and `billingEmail` when supplied) MUST contain an `@` and a
+  domain part; an obviously malformed value is rejected locally with a field-named error before
+  any remote call. The library does **not** perform strict RFC validation — BML remains the
+  authority on acceptance beyond this basic shape.
+- Q: Which submitted fields are scanned for a PAN/CVV pattern before sending? → A: Every
+  caller-supplied string value — `name`, `email`, all billing fields, `taxId`, the `actor`
+  reference, and any other string the caller provides. If any value matches a PAN or CVV pattern
+  the call is rejected locally before any remote request. This is the most protective default and
+  leaves no unscanned field.
+- Q: How is the audit record for create/update/archive emitted to the integrator? → A: As a
+  structured, masked log line through the library's existing logger — the same logging path
+  FR-015 already mandates. No new audit-sink configuration is introduced; auditing is observable
+  in tests by inspecting the emitted log line.
+
 ### Session 2026-09-07
 
 - Q: The retired spec required `first_name` / `last_name` / `email`. What does BML actually
@@ -148,8 +165,9 @@ often.
   authentication/configuration error rather than returning an empty result.
 - Remote outage or timeout: the operation MUST raise a distinguishable availability error and
   MUST NOT return a partial record.
-- A caller passing card data (a PAN or CVV) in a customer field: the library MUST reject the
-  call locally before any remote request. Customer records are not a place for card data.
+- A caller passing card data (a PAN or CVV) in any customer field: the library MUST reject the
+  call locally before any remote request, scanning every caller-supplied string value (see
+  FR-014). Customer records are not a place for card data.
 - Archiving a customer that still has stored tokens: BML's behavior here is **[UNVERIFIED]**.
   The library MUST NOT assume a cascade in either direction until confirmed against UAT.
 
@@ -174,8 +192,12 @@ often.
   NOT send unspecified fields as null, which would erase data.
 - **FR-007**: The library MUST allow archiving a customer via
   `DELETE /public-customers/{customerId}`, treating `204` as success with no body.
-- **FR-008**: The library MUST validate that required inputs are present and well-formed before
-  contacting BML, raising an error naming the offending field without making a remote call.
+- **FR-008**: The library MUST validate that required inputs are present and non-empty before
+  contacting BML, raising an error naming the offending field without making a remote call. For
+  `email` (and `billingEmail` when supplied) the library MUST additionally apply a lightweight
+  shape check — the value MUST contain an `@` and a domain part — and reject an obviously
+  malformed address locally. It MUST NOT perform strict RFC email validation; BML remains the
+  authority on acceptance beyond this basic shape.
 - **FR-009**: The library MUST perform every operation against the environment selected on the
   client and MUST NOT cross environments.
 - **FR-010**: The library MUST authenticate using the client's configured API key, sent as a raw
@@ -184,12 +206,17 @@ often.
 - **FR-011**: The library MUST surface remote failures as distinguishable errors — validation,
   not-found, authentication, conflict, rate-limit, and availability — rather than raw HTTP codes.
 - **FR-012**: Every create, update, and archive operation MUST emit an audit record capturing
-  who, what, when, and outcome. Reads (retrieve, list) are not audited.
+  who, what, when, and outcome. The record MUST be emitted as a structured, masked log line
+  through the library's existing logger (the same path as FR-015); no separate audit-sink
+  configuration is introduced. Reads (retrieve, list) are not audited.
 - **FR-013**: The audit "who" MUST default to the configured App ID, and each operation MUST
   accept an optional actor reference. The actor MUST NOT contain cardholder data; the library
   MUST reject an actor that matches a PAN pattern.
 - **FR-014**: The library MUST NOT accept, transmit, log, or persist a PAN, CVV, or any Sensitive
-  Authentication Data through the customers resource.
+  Authentication Data through the customers resource. It MUST scan **every** caller-supplied
+  string value — `name`, `email`, all billing fields, `taxId`, the `actor` reference, and any
+  other string provided — for a PAN or CVV pattern, and reject the call locally (naming the
+  offending field) before any remote request. No caller-supplied string field is exempt.
 - **FR-015**: Structured log lines MUST be masked and MUST NOT contain the API key or any
   cardholder data.
 - **FR-016**: Every operation MUST be independently testable against UAT without production
@@ -231,7 +258,8 @@ often.
 - The customers resource reuses the existing `BMLConnect::Client` for base URL, mode
   (`production` / `sandbox`), and the API key. No new configuration mechanism is introduced.
 - BML is the source of truth for field semantics; the library mirrors the contract and does not
-  impose its own validation beyond presence of the documented required fields.
+  impose its own validation beyond presence of the documented required fields and a lightweight
+  `@`-and-domain shape check on email values (see FR-008).
 - List pagination parameters are not described in `Connect-API.json`. The library ships list
   without page parameters until UAT observation confirms their names.
 

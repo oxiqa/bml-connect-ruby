@@ -47,15 +47,19 @@ customer payload, it cannot reach the object, a log line, or an audit record.
 |---|---|---|
 | `name` present and non-blank | create | `ValidationError(field: :name)` |
 | `email` present and non-blank | create | `ValidationError(field: :email)` |
+| `email` shape: contains an `@` and a domain part | create, update (when supplied) | `ValidationError(field: :email)` |
+| `billingEmail` shape: contains an `@` and a domain part | create, update (when supplied) | `ValidationError(field: :billing_email)` |
 | `customer_id` present and non-blank | retrieve, update, archive | `ValidationError(field: :customer_id)` |
 | `changes` non-empty | update | `ValidationError(field: :changes)` |
-| No value matches a PAN pattern | all | `ValidationError` |
+| No caller-supplied string value matches a PAN/CVV pattern | all | `ValidationError` |
 | `actor` does not match a PAN pattern | all | `ValidationError(field: :actor)` |
 
 Validation order is presence → shape → PAN screen. No remote call is made when any rule fails.
 
-`email` is checked for presence only. BML is the authority on address validity; imposing a
-stricter local regex risks rejecting an address BML would accept (Constitution V).
+`email` (and `billingEmail` when supplied) gets a **lightweight shape check only** — the value
+must contain an `@` and a domain part. The library does **not** apply strict RFC validation: BML
+remains the authority on acceptance beyond this basic shape, and a stricter local regex risks
+rejecting an address BML would accept (Constitution V). See spec clarification 2026-09-08.
 
 ### Lifecycle
 

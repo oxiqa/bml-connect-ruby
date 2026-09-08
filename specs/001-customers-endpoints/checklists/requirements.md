@@ -36,22 +36,23 @@
 - [x] The authentication scheme matches `components.securitySchemes`
 - [x] Anything not in the published document is marked `[UNVERIFIED]`
 - [x] A verification table exists and is honest about what has *not* been observed live
-- [ ] **Every operation observed against UAT** — BLOCKED, see Notes
+- [x] **Every operation observed against UAT** — all five verified live 2026-09-08, see Notes
 
 ## Notes
 
 - Items marked incomplete require spec updates before `/speckit-clarify` or `/speckit-plan`.
-- Four `[UNVERIFIED]` markers remain, all recorded in `contracts/bml-remote.md`: list pagination
-  parameters, the 404 body on an unknown customer id, the effect of archiving on a customer's
-  stored tokens, and whether `count` arrives as a string or an integer. None blocks planning;
-  all are scheduled for resolution in T033.
-- **The live-verification checkbox cannot be ticked yet.** The only BML key currently available
-  (from `msgowl/website`'s development credentials) is rejected by UAT with `PP-C-004` even on
-  the known-working `/public/transactions` path, so no customer operation has been observed
-  end-to-end. A newly issued UAT key from the merchant dashboard is a hard prerequisite for
-  closing the verification table. This checklist is deliberately left unticked rather than
-  marked complete — the retired `bml_tokenization` shipped four features with all boxes ticked
-  and zero live verification, which is the exact failure this section exists to prevent.
+- Of the four original `[UNVERIFIED]` markers, **two are resolved** by the 2026-09-08 UAT run
+  (recorded in `contracts/bml-remote.md`): the 404 body on an unknown id is
+  `{"message":"Customer not found","code":"PP-CU-001"}`, and `count` arrives as an **Integer**.
+  Two remain and are correctly out of scope for this feature: list pagination parameters (not
+  exercised) and the archive→stored-token cascade (depends on feature `002`).
+- **The live-verification checkbox is now ticked — legitimately.** A provisioned UAT key
+  authenticates on `/public/me` and every customer path, and all five operations
+  (`create`/`retrieve`/`list`/`update`/`archive`) were exercised end-to-end via
+  `spec/integration/customers_uat_spec.rb` and passed. The live run also surfaced two document
+  discrepancies the OpenAPI file hid — responses use `_id`/`id` (both present, equal) and
+  `createdAt`/`updatedAt` rather than `created`/`updated` — which is exactly why this box requires
+  observation, not stubs. The credentials live only in this repo's git-ignored `.env`.
 - The retired spec's `first_name`/`last_name` model was corrected to BML's single `name` field,
   and its full-replace `PUT` update was corrected to a partial-merge `PATCH`. Both changes are
   recorded in Clarifications with the schema evidence.

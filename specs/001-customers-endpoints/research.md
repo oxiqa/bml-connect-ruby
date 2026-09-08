@@ -2,9 +2,11 @@
 
 **Feature**: `001-customers-endpoints` | **Date**: 2026-09-07
 
-The specification has no `[NEEDS CLARIFICATION]` markers; five behavioral questions were fixed
-in the 2026-09-07 clarification session, all resolved by reading `reference/Connect-API.json`
-rather than by assumption. What remains are implementation-context choices, resolved below.
+The specification has no `[NEEDS CLARIFICATION]` markers. Five behavioral questions were fixed in
+the 2026-09-07 clarification session (all resolved by reading `reference/Connect-API.json` rather
+than by assumption); a 2026-09-08 session settled three more — email validation depth (R11), the
+scope of PAN screening (folded into R7), and how audit records are emitted (R12). What remains are
+implementation-context choices, resolved below.
 
 ## R1. Transport — Faraday, not `net/http`
 
@@ -77,13 +79,14 @@ rather than by assumption. What remains are implementation-context choices, reso
 
 ## R7. PAN screening on input
 
-- **Decision**: Screen every string value in create/update payloads, and the optional `actor`,
-  against a PAN pattern; raise `ValidationError` locally on a match.
+- **Decision**: Screen **every** caller-supplied string value in create/update payloads, plus the
+  optional `actor`, against a PAN/CVV pattern; raise `ValidationError` locally on a match. No
+  caller-supplied string field is exempt (confirmed by the 2026-09-08 clarification).
 - **Rationale**: Customer records have no legitimate card field. A caller pasting a card number
   into `taxId` or a note would otherwise transmit and persist a PAN into a system not scoped for
-  it. Screening locally keeps it out of the request, the logs, and the audit trail
-  (Constitution I). Ported directly from the retired gem's `Masking::PAN_PATTERN`, which was
-  sound.
+  it. Screening every field — not a curated subset — keeps it out of the request, the logs, and
+  the audit trail (Constitution I, most-protective default). Ported directly from the retired
+  gem's `Masking::PAN_PATTERN`, which was sound.
 - **Alternatives considered**: Screen only known-risky fields (rejected — the risk is precisely
   in the field nobody anticipated); screen on output only (rejected — too late; the PAN has
   already crossed the wire).
@@ -118,3 +121,33 @@ rather than by assumption. What remains are implementation-context choices, reso
 - **Rationale**: The retired gem's 28 failures were entirely caused by specs hardcoding
   `https://api.sandbox.bml.mv` while the client's constant moved to the real BML host. Deriving
   the stub URL from the client makes that class of drift impossible.
+
+## R11. Email validation depth — lightweight shape check
+
+- **Decision**: Validate `email` (and `billingEmail` when supplied) with a **lightweight shape
+  check** — the value must contain an `@` and a domain part — after the presence check and before
+  the PAN screen. Do not apply strict RFC-style validation.
+- **Rationale**: BML's schema types `email` as `minLength: 1`, not `format: email`, so a bare
+  presence check would pass an obviously malformed value like `"aisha"` and only discover the
+  problem on the remote round trip. A minimal `@`-and-domain check catches the common
+  fat-finger locally and names the field (SC-006) without the library becoming a stricter gate
+  than BML itself — a strict regex would risk rejecting an address BML would accept
+  (Constitution V). Settled by the 2026-09-08 clarification (option B).
+- **Alternatives considered**: Presence-only (rejected — pushes trivially-catchable errors to a
+  remote failure); strict RFC 5322 validation (rejected — the library must not be more
+  restrictive than the platform it wraps).
+
+## R12. Audit emission — a log line, not a sink
+
+- **Decision**: Emit the audit record for `create`/`update`/`archive` as a **structured, masked
+  log line through the client's existing logger**. Introduce no separate `audit_sink`
+  configuration object.
+- **Rationale**: FR-015 already mandates a masked structured-logging path; routing the audit
+  record through it satisfies FR-012 with zero new public configuration surface (Constitution V,
+  YAGNI) and keeps the record observable in tests by asserting on the emitted line. A pluggable
+  sink is speculative until an integrator asks for one. Settled by the 2026-09-08 clarification
+  (option A).
+- **Alternatives considered**: A caller-configurable `audit_sink` callback (rejected — new
+  surface, no demonstrated need); log *and* invoke an optional sink (rejected — same, plus two
+  code paths to keep masked). `audit.rb` still exists as the shared formatter/emitter; it writes
+  to the logger rather than to a sink.

@@ -1,6 +1,7 @@
 # Implementation Plan: Customers Endpoints
 
-**Branch**: `001-customers-endpoints` | **Date**: 2026-09-07 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-customers-endpoints` | **Date**: 2026-09-07 (design artifacts reconciled with the
+2026-09-08 clarification session) | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/001-customers-endpoints/spec.md`
 
@@ -61,7 +62,7 @@ Derived from `.specify/memory/constitution.md` **v2.0.0**.
 | II | Test-first; success/failure/rejection paths | Tasks order failing tests before implementation, covering success, local-validation rejection, not-found, auth, and availability. | PASS |
 | II | **Stub is not evidence; stub URLs derived from base URL** | T004 adds a conformance test reading `Connect-API.json`; every contract stub interpolates `client.base_url` rather than hardcoding a host. This is the direct fix for the failure that produced 28 broken specs in the retired gem. | PASS |
 | III | Contract from published spec; live verification; `[UNVERIFIED]` marking | `contracts/bml-remote.md` quotes the document throughout, marks pagination and 404 behavior `[UNVERIFIED]`, and carries a verification table that cannot be closed without UAT observation. | PASS |
-| IV | Masked structured logs; audit on state change; actionable errors | Masked logger; audit on create/update/archive (FR-012); distinguishable error hierarchy (FR-011). | PASS |
+| IV | Masked structured logs; audit on state change; actionable errors | Masked logger; audit on create/update/archive emitted as a structured masked log line through that same logger — no separate sink (FR-012, R12); distinguishable error hierarchy (FR-011). | PASS |
 | V | Simplest design; no invented conveniences | One class, no new dependency, no cross-resource orchestration. `archive` is named for what BML does rather than presented as a hard delete. | PASS |
 
 **Initial Constitution Check: PASS** — no violations; Complexity Tracking not required.
@@ -69,7 +70,9 @@ Derived from `.specify/memory/constitution.md` **v2.0.0**.
 ## Phase 0 — Research
 
 See [research.md](./research.md). Resolves: transport choice, partial-update serialization,
-pagination absence, soft-delete naming, `count` typing, and the PAN-screen placement.
+pagination absence, soft-delete naming, `count` typing, PAN-screen placement and scope (every
+caller-supplied string — R7), email validation depth (lightweight `@`/domain shape check — R11),
+and audit emission (a masked log line through the existing logger, no separate sink — R12).
 
 ## Phase 1 — Design
 

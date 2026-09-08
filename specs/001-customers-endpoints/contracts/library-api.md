@@ -30,7 +30,11 @@ customer.companyId # => "…"
 
 - Validates `name` and `email` are present and non-blank **before** any remote call; raises
   `BMLConnect::ValidationError` naming the field otherwise.
-- Rejects any value matching a PAN pattern, in any field, with `ValidationError`.
+- Applies a lightweight shape check to `email` (and `billingEmail` when supplied) — the value
+  must contain an `@` and a domain part. No strict RFC validation; BML is the authority beyond
+  that shape.
+- Rejects any value matching a PAN/CVV pattern, in **any** caller-supplied string field, with
+  `ValidationError`.
 - Returns `BMLConnect::Models::Customer`.
 - Emits an audit record (`action: :create`).
 
@@ -117,8 +121,11 @@ All inherit `BMLConnect::Error`:
 
 ## Audit records
 
-State-changing operations (`create`, `update`, `archive`) emit a record to the client's
-configured `audit_sink` (any object responding to `#call` or `#<<`):
+State-changing operations (`create`, `update`, `archive`) emit an audit record as a **structured,
+masked log line through the client's existing logger** — the same logging path used elsewhere in
+the library. There is **no** separate `audit_sink` configuration; auditing is observable in tests
+by inspecting the emitted log line. The record's structured payload captures who / what / when /
+outcome:
 
 ```ruby
 { action: :create, who: { app_id: "…", actor: "ops:jane" },
