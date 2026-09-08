@@ -5,6 +5,12 @@ Ruby gem for the Bank of Maldives Connect API
 Use this gem to interact with your Bank of Maldives Connect API:
 - 💳 __Transactions__
 
+**Planned** — specified against BML's published contract, not yet implemented. See
+[Roadmap](#roadmap):
+- 👤 __Customers__
+- 🔐 __Stored card tokens__
+- 🔁 __Charging a stored card__
+
 
 ## Installation
 
@@ -71,6 +77,68 @@ To transaction list
 resp = client.transactions.list({ page: 2 })
 ```
 API responses are instances of [`Faraday::Response`](https://github.com/lostisland/faraday/blob/main/lib/faraday/response.rb) class, `json` encoded with symbolized names. 
+
+## Roadmap
+
+Tokenization support is moving into this gem. It was previously being built as a separate
+`bml_tokenization` gem, which turned out to have been specified against an assumed API contract
+that does not match BML's published one — see [MIGRATION.md](MIGRATION.md) for the full account.
+
+Work is now spec-driven against BML's own OpenAPI document, vendored at
+[`reference/Connect-API.json`](reference/Connect-API.json). Where this library and that document
+disagree, the document wins.
+
+| Feature | Endpoints | Status |
+|---|---|---|
+| [`001-customers-endpoints`](specs/001-customers-endpoints/) | `/public-customers` | Specified |
+| [`002-stored-card-tokens`](specs/002-stored-card-tokens/) | `/public-customers/{id}/tokens` | Specified |
+| [`003-transactions-v2`](specs/003-transactions-v2/) | `/public/v2/transactions` | Specified |
+| [`004-token-charge`](specs/004-token-charge/) | `/public-customers/charge` | Specified, release-blocked |
+
+Each feature directory carries a `spec.md`, `plan.md`, `research.md`, `data-model.md`, `tasks.md`
+and two contracts — one for the BML HTTP surface, one for the Ruby surface this gem exposes.
+
+### How tokenization actually works
+
+Worth stating up front, because it is not what most payment APIs do: **there is no endpoint that
+creates a token.** A stored card comes into existence as a side effect of a transaction that
+carries `tokenizationDetails`, completed by the cardholder on BML's hosted page. Later charges
+are a two-step flow — create a transaction, then charge it against the stored token.
+
+```
+create customer  ─►  create transaction with tokenizationDetails  ─►  cardholder pays
+                                                                          │
+                     charge stored token  ◄──  token now listed  ◄────────┘
+```
+
+### Backward compatibility
+
+The transactions methods documented above are **not changing**. `create`, `get` and `list` keep
+their current endpoints, signatures and `Faraday::Response` return type. New capabilities arrive
+under new method names.
+
+`transactions.create` will be marked **deprecated** in favour of a `create_v2` targeting BML's
+documented `/public/v2/transactions`, but it will continue to work — it is live and carries
+production traffic today.
+
+## Contributing to the specs
+
+This repository uses [Spec Kit](https://github.com/github/spec-kit). The active feature is
+tracked in `.specify/feature.json`:
+
+```bash
+./speckit-feature            # show the active feature and the status of each
+./speckit-feature 002        # switch the active feature
+```
+
+The project constitution is at [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
+Two rules matter most for anyone adding a remote call:
+
+1. **A stubbed test is not evidence that an endpoint exists.** Every path must be traceable to
+   `reference/Connect-API.json`, and stub URLs must derive from the client's base URL rather than
+   being hardcoded.
+2. **Anything not in the published document is marked `[UNVERIFIED]`** and must be confirmed
+   against UAT before it is relied on.
 
 ## Development
 
