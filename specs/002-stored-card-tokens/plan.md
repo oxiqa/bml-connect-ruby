@@ -38,10 +38,10 @@ adding it is a shared-infrastructure change consumed here (see research R9).
 
 **Constraints**: TLS only; the library never accepts card input on this resource and never
 returns a full PAN; masked structured logging; audit record on delete; strict environment
-isolation; tokens strictly scoped to their owning customer. Transient failures (`429`, timeout,
-`5xx`) are retried with bounded exponential backoff on all three operations — delete included,
-because soft-delete is idempotent — then surfaced as the original distinguishable error
-(FR-013a); non-transient errors are never retried.
+isolation; tokens strictly scoped to their owning customer. Transient failures (`429`, `408`,
+timeout, `5xx`) are retried with bounded backoff (shared-transport `max_retries`/`retry_backoff`)
+on all three operations — delete included, because soft-delete is idempotent — then surfaced as
+the original distinguishable error (FR-013a); non-transient errors are never retried.
 
 **Scale/Scope**: 3 operations, 2 value objects, 1 resource class.
 

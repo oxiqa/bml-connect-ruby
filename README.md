@@ -113,6 +113,46 @@ Notes:
   `NotFoundError`, `AuthenticationError`, `ConflictError`, `RateLimitError` (carries
   `#retry_after`), and `AvailabilityError` (timeouts / 5xx after bounded retries).
 
+### Stored cards (tokens)
+
+The tokens resource wraps BML's `/public-customers/{customerId}/tokens` endpoints. It is
+**read-and-delete only** — list, retrieve, delete — because BML publishes no endpoint that
+creates a token. A stored card comes into existence only as a side effect of a tokenizing
+transaction (feature `003`), completed by the cardholder on BML's hosted page; see
+[How tokenization actually works](#how-tokenization-actually-works). Every path is nested under a
+`customerId`.
+
+```ruby
+# List a customer's saved cards
+client.tokens.list("cus_123").each do |t|
+  puts "#{t.brand} #{t.paddedCardNumber} exp #{t.tokenExpiryMonth}/#{t.tokenExpiryYear}"
+end
+
+client.tokens.retrieve("cus_123", "tok_456")                    # => Token
+client.tokens.delete("cus_123", "tok_456", actor: "ops:jane")   # => true (soft delete)
+```
+
+Notes:
+
+- **No create, no detokenize.** There is deliberately no `client.tokens.create`/`tokenize`/
+  `detokenize` — the absence is enforced by a test. If you are looking for one, tokens are created
+  via feature `003`, not here.
+- **No card data.** No operation accepts a PAN, CVV, expiry, or capture handle. A token is
+  represented only by BML's own fields (`token`, `brand`, `paddedCardNumber`, `tokenExpiryMonth`,
+  `tokenExpiryYear`, …); the gem invents no `last_four`/`scheme` alias and exposes no full card
+  number. Responses are whitelisted, so a stray card field can never reach an object, log, or audit
+  record.
+- **Empty vs. broken.** An empty token list is an empty `TokenList`, never an error, and an
+  authentication failure is never swallowed into one.
+- **Auditing.** Only `delete` is audited (reads are not); it emits a single masked audit line —
+  once, even if the delete is retried. Pass an optional `actor:` (screened for card data) to
+  attribute it.
+- **Retries.** Transient failures (`429`, `408`, timeouts, `5xx`) are retried on all three
+  operations — delete included, since soft-delete is idempotent — with bounded backoff, then raised
+  as `RateLimitError`/`AvailabilityError`. Tune via `Client.new(options: { max_retries: 2,
+  retry_backoff: 0.5 })`; set `max_retries: 0` to disable. A `429`'s `Retry-After` is surfaced on
+  `RateLimitError#retry_after`.
+
 ## Roadmap
 
 Tokenization support is moving into this gem. It was previously being built as a separate
@@ -126,7 +166,7 @@ disagree, the document wins.
 | Feature | Endpoints | Status |
 |---|---|---|
 | [`001-customers-endpoints`](specs/001-customers-endpoints/) | `/public-customers` | Implemented (pending live UAT verification) |
-| [`002-stored-card-tokens`](specs/002-stored-card-tokens/) | `/public-customers/{id}/tokens` | Specified |
+| [`002-stored-card-tokens`](specs/002-stored-card-tokens/) | `/public-customers/{id}/tokens` | Implemented (pending live UAT verification) |
 | [`003-transactions-v2`](specs/003-transactions-v2/) | `/public/v2/transactions` | Specified |
 | [`004-token-charge`](specs/004-token-charge/) | `/public-customers/charge` | Specified, release-blocked |
 

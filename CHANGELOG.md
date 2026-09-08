@@ -1,6 +1,18 @@
 ## [Unreleased]
 
 ### Added
+- **Stored card tokens resource** (`client.tokens`), implementing feature `002-stored-card-tokens`
+  against BML's `/public-customers/{customerId}/tokens` contract: `list`, `retrieve`, and `delete`
+  (soft delete, `204`). Read-and-delete **only** — BML publishes no token-creation endpoint, so the
+  resource deliberately exposes no `create`/`tokenize`/`detokenize` method and a test enforces the
+  absence (SC-006). Returns whitelisted `BMLConnect::Models::Token` / `TokenList` value objects
+  (mirroring BML's field names — no `last_four`/`scheme` alias) and raises the shared typed error
+  hierarchy. Only `delete` is audited, once, even across retries; the optional `actor:` is screened
+  for card data.
+- Extended the shared transport to retry `429` responses (in addition to `408`/timeouts/`5xx`) with
+  bounded backoff on every resource (FR-013a); a surviving `429` still surfaces as `RateLimitError`
+  carrying `Retry-After`. Retry knobs are `max_retries` / `retry_backoff` on the client
+  (`max_retries: 0` disables).
 - **Customers resource** (`client.customers`), implementing feature `001-customers-endpoints`
   against BML's `/public-customers` contract: `create`, `retrieve`, `list`, partial `update`
   (`PATCH`), and `archive` (soft delete). Returns whitelisted `BMLConnect::Models::Customer` /

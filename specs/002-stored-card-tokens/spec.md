@@ -24,7 +24,7 @@ Keeping two features would mean two specs describing one resource.
 
 - Q: On a `429` rate-limit or a transient availability error (timeout / `5xx`), should the library
   auto-retry or surface immediately? → A: **Retry all three operations** (list, retrieve, delete)
-  with bounded exponential backoff, relying on the delete's soft-delete idempotency. When retries
+  with bounded backoff, relying on the delete's soft-delete idempotency. When retries
   are exhausted, surface the original distinguishable error (rate-limit vs availability).
 - Q: How does a caller supply the audit "actor reference" for a delete? → A: As a **per-call
   keyword argument** on the delete operation, scoped to that one call; when omitted the audit
@@ -127,10 +127,10 @@ customer's token list and can no longer be charged.
 - Misconfigured client: MUST raise an authentication/configuration error rather than returning an
   empty token list. An empty list and an auth failure MUST NOT be confusable — this matters
   because "customer has no saved cards" and "our key is broken" would otherwise look identical.
-- Remote outage or timeout: the library MUST retry with bounded exponential backoff and, once
+- Remote outage or timeout: the library MUST retry with bounded backoff and, once
   retries are exhausted, MUST raise a distinguishable availability error and MUST NOT return a
   partial collection.
-- Rate limiting (`429`): the library MUST retry with bounded exponential backoff and, once retries
+- Rate limiting (`429`): the library MUST retry with bounded backoff and, once retries
   are exhausted, MUST raise a distinguishable rate-limit error separate from an availability error.
 - A caller attempting to obtain the full card number from a token: the library MUST expose no
   such operation. There is no detokenization endpoint in the contract and none will be added.
@@ -174,8 +174,8 @@ customer's token list and can no longer be charged.
   not-found, authentication, rate-limit, availability.
 - **FR-013a**: On a `429` rate-limit or a transient availability failure (timeout / `5xx`), the
   library MUST retry the operation — including `delete`, which is safe to repeat because deletion
-  is idempotent (soft delete) — using bounded exponential backoff. Retry counts and backoff bounds
-  MUST be configurable on the client. Once retries are exhausted, the library MUST raise the
+  is idempotent (soft delete) — using bounded backoff. Retry count and backoff interval
+  MUST be configurable on the client (`max_retries` / `retry_backoff`). Once retries are exhausted, the library MUST raise the
   original distinguishable error (rate-limit vs availability). Non-transient errors (validation,
   not-found, authentication) MUST NOT be retried.
 - **FR-014**: Token deletion MUST emit an audit record capturing who, what, when, and outcome.

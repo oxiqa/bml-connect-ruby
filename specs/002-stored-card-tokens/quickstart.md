@@ -54,10 +54,10 @@ end
 An empty list and an auth failure are deliberately different outcomes (research R6). Never
 rescue the latter into the former.
 
-Transient failures (`429`, timeout, `5xx`) are retried automatically with bounded exponential
-backoff before the error surfaces — on all three operations, delete included. Tune or disable it
-on the client (`max_retries:`, `retry_base:`, `retry_cap:`); see `contracts/library-api.md` and
-research R9.
+Transient failures (`429`, `408`, timeout, `5xx`) are retried automatically with bounded backoff
+before the error surfaces — on all three operations, delete included. Tune or disable it on the
+client (`options: { max_retries:, retry_backoff: }`; `max_retries: 0` disables); see
+`contracts/library-api.md` and research R9.
 
 ## Running the tests
 

@@ -95,8 +95,8 @@
 ## R9. Retry and backoff on transient failures (FR-013a)
 
 - **Decision**: Retry all three operations — list, retrieve, **and delete** — on transient
-  failures, using bounded exponential backoff, then surface the original distinguishable error
-  when retries are exhausted.
+  failures, using bounded backoff (the shared transport's existing linear `retry_backoff *
+  attempt` schedule), then surface the original distinguishable error when retries are exhausted.
   - **Retryable**: HTTP `429`, HTTP `5xx`, and connection/read timeouts (the conditions that would
     otherwise raise `RateLimitError` / `AvailabilityError`).
   - **Never retried**: local `ValidationError` (never reaches the network), and non-transient
@@ -104,14 +104,19 @@
   - **Delete is retried** because BML's delete is a soft delete and therefore idempotent: repeating
     it yields the same terminal state (`204`, or a subsequent not-found/`deleted: true`), never a
     double effect. This is the explicit choice recorded in the 2026-09-08 clarification.
-- **Defaults (library-chosen, all overridable on the client)**: max 3 attempts (2 retries), base
-  delay 0.2s, factor 2, cap 2s, with full jitter. Exposed as client options
-  (`max_retries`, `retry_base`, `retry_cap`) so an integrator can tune or disable them
-  (`max_retries: 0`). Resolves the "bounded" ambiguity by naming concrete defaults rather than
-  leaving them implicit.
-- **`Retry-After` precedence**: on a `429` that carries a `Retry-After` header (delta-seconds or
-  HTTP-date), honor it for that attempt's wait; fall back to exponential backoff when the header is
-  absent or unparseable. A server-stated wait is more accurate than a guess.
+- **Defaults / option names (reuse feature `001`'s established knobs, not new ones)**: the shared
+  transport already exposes `max_retries` (default 2 → at most 3 attempts) and `retry_backoff`
+  (default 0.5s, applied as `retry_backoff * attempt` — a bounded *linear* backoff). This feature
+  reuses those verbatim rather than inventing `retry_base`/`retry_cap`/exponential+jitter, per
+  Constitution V (no gratuitous churn to a shared layer that customers already depend on).
+  `max_retries: 0` disables retry. Resolves the "bounded" ambiguity by pointing at concrete,
+  already-shipped knobs.
+- **`Retry-After`**: a `429`'s `Retry-After` header is **surfaced on `RateLimitError#retry_after`**
+  for the caller, but does **not** override the internal backoff wait. Reasons: the library's
+  bounded `retry_backoff` schedule governs the synchronous wait (deterministic and test-friendly —
+  tests zero it), and honoring an arbitrary server-supplied delay inside a blocking client call
+  could stall a caller for an unbounded time. (This narrows the earlier proposal to honor
+  `Retry-After` for the wait; the header is still respected, just handed to the caller.)
 - **Audit interaction**: a retried delete emits exactly **one** audit record, written after the
   retry sequence settles, capturing the final outcome (success after N attempts, or the terminal
   error). No per-attempt audit records — the audit answers "did this deletion happen", not "how
