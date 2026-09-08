@@ -1,0 +1,34 @@
+# Secret-scanning configuration (gitleaks).
+#
+# Constitution: "Secrets scanning MUST run against changes; a detected secret
+# blocks merge until remediated." This config extends the default gitleaks
+# ruleset with project-specific patterns and allowlists the example/test
+# fixtures that intentionally contain placeholder or synthetic values.
+
+title = "bml-connect-ruby secret scan"
+
+[extend]
+# Inherit gitleaks' built-in rules (AWS keys, generic API keys, JWTs, etc.).
+useDefault = true
+
+[[rules]]
+id = "bml-api-key"
+description = "BML Connect API key assigned to a variable"
+# Catch a long secret assigned to a BML_API_KEY-style variable.
+regex = '''(?i)(bml[_-]?api[_-]?key|bml[_-]?mpg[_-]?key)\s*[:=]\s*['"]?[A-Za-z0-9._\-]{20,}['"]?'''
+tags = ["bml", "api-key"]
+
+[allowlist]
+description = "Placeholders, synthetic test PANs, and doc fixtures are not secrets"
+paths = [
+  '''\.env\.example$''',
+  '''specs/.*\.md$''',
+  '''spec/.*_spec\.rb$''',
+  '''reference/Connect-API\.json$''',
+]
+regexes = [
+  # Synthetic card numbers used in rejection tests (never real cardholder data).
+  '''4111111111111111''',
+  '''not-set''',
+  '''apikey''',
+]

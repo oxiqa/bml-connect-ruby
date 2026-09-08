@@ -1,5 +1,8 @@
 AllCops:
-  TargetRubyVersion: 2.4
+  # Matches the installed toolchain (2.7.4). rubocop >= 1.13 dropped 2.4-target
+  # analysis, so the previous value made rubocop unrunnable.
+  TargetRubyVersion: 2.7
+  NewCops: disable
 
 Style/StringLiterals:
   Enabled: true
@@ -11,3 +14,24 @@ Style/StringLiteralsInInterpolation:
 
 Layout/LineLength:
   Max: 120
+
+# Comments intentionally use en/em dashes, matching the spec and contract docs.
+Style/AsciiComments:
+  Enabled: false
+
+# Pragmatic limits for a small API-client resource: five CRUD methods plus
+# their validation helpers legitimately run a little longer than the defaults.
+Metrics/MethodLength:
+  Max: 20
+
+Metrics/AbcSize:
+  Max: 20
+
+Metrics/ClassLength:
+  Max: 200
+
+# RSpec describe/context blocks are legitimately long; block-length limits are
+# meant for production methods, not example groups.
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*"
