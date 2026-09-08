@@ -4,10 +4,10 @@ Ruby gem for the Bank of Maldives Connect API
 
 Use this gem to interact with your Bank of Maldives Connect API:
 - 💳 __Transactions__
+- 👤 __Customers__
 
 **Planned** — specified against BML's published contract, not yet implemented. See
 [Roadmap](#roadmap):
-- 👤 __Customers__
 - 🔐 __Stored card tokens__
 - 🔁 __Charging a stored card__
 
@@ -78,6 +78,41 @@ resp = client.transactions.list({ page: 2 })
 ```
 API responses are instances of [`Faraday::Response`](https://github.com/lostisland/faraday/blob/main/lib/faraday/response.rb) class, `json` encoded with symbolized names. 
 
+### Customers
+
+The customers resource wraps BML's `/public-customers` endpoints. Unlike `transactions` (which
+returns a raw `Faraday::Response`), it returns whitelisted value objects and **raises** on
+failure. Reach it through the same configured client:
+
+```ruby
+customer = client.customers.create(name: "Aisha Ali", email: "aisha@example.mv")
+customer.id         # => BML-assigned id, the handle for tokens and charges
+customer.companyId  # => platform-set
+
+client.customers.retrieve(customer.id)                       # => Customer
+client.customers.list.each { |c| puts c.email }              # Enumerable {count, items} envelope
+client.customers.update(customer.id, billingCity: "Male")    # partial merge: only supplied keys sent
+client.customers.archive(customer.id)                        # => true (soft delete; record keeps deleted: true)
+```
+
+Notes:
+
+- **Required on create:** `name` and `email`. Optional documented fields (`billingEmail`,
+  `billingAddress1`, `billingCity`, `billingCountry`, `billingPostCode`, `taxId`, …) pass through
+  unchanged. `email`/`billingEmail` get a lightweight shape check (must contain an `@` and a
+  domain); BML remains the authority beyond that.
+- **Update is a partial merge** (`PATCH`): only the keys you pass are sent — an unset field is
+  never serialized as `null`, so it cannot erase stored data.
+- **No card data.** Every caller-supplied string is screened for a card-number pattern and
+  rejected locally before any request; responses are whitelisted so a stray card field can never
+  reach an object, a log line, or the audit trail.
+- **Auditing.** `create`, `update` and `archive` emit a masked, structured audit line through the
+  client's logger (who / what / when / outcome). Pass an optional `actor:` to attribute the call;
+  reads are not audited. Inject your own logger via `Client.new(options: { logger: my_logger })`.
+- **Errors** are a typed hierarchy under `BMLConnect::Error`: `ValidationError` (carries `#field`),
+  `NotFoundError`, `AuthenticationError`, `ConflictError`, `RateLimitError` (carries
+  `#retry_after`), and `AvailabilityError` (timeouts / 5xx after bounded retries).
+
 ## Roadmap
 
 Tokenization support is moving into this gem. It was previously being built as a separate
@@ -90,7 +125,7 @@ disagree, the document wins.
 
 | Feature | Endpoints | Status |
 |---|---|---|
-| [`001-customers-endpoints`](specs/001-customers-endpoints/) | `/public-customers` | Specified |
+| [`001-customers-endpoints`](specs/001-customers-endpoints/) | `/public-customers` | Implemented (pending live UAT verification) |
 | [`002-stored-card-tokens`](specs/002-stored-card-tokens/) | `/public-customers/{id}/tokens` | Specified |
 | [`003-transactions-v2`](specs/003-transactions-v2/) | `/public/v2/transactions` | Specified |
 | [`004-token-charge`](specs/004-token-charge/) | `/public-customers/charge` | Specified, release-blocked |

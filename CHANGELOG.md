@@ -1,6 +1,23 @@
 ## [Unreleased]
 
 ### Added
+- **Customers resource** (`client.customers`), implementing feature `001-customers-endpoints`
+  against BML's `/public-customers` contract: `create`, `retrieve`, `list`, partial `update`
+  (`PATCH`), and `archive` (soft delete). Returns whitelisted `BMLConnect::Models::Customer` /
+  `CustomerList` value objects and raises a typed error hierarchy
+  (`ValidationError`/`NotFoundError`/`AuthenticationError`/`ConflictError`/`RateLimitError`/`AvailabilityError`)
+  instead of the raw `Faraday::Response` that `transactions` returns.
+- Shared infrastructure consumed by later features `002`/`004`: `BMLConnect::Errors`,
+  `Masking` (Luhn-gated PAN detection + log scrubbing), `Audit` (masked structured audit line via
+  the client's logger — no separate sink), and a `Resource` transport base (URL derived from the
+  client's base URL, status→error mapping, bounded retry with backoff, `Retry-After` on 429).
+- Local safeguards: required-field and lightweight email-shape validation, and PAN/CVV screening
+  of **every** caller-supplied string (and the optional `actor`) before any remote call.
+- Test tiers: unit, contract (WebMock, stub URLs derived from `client.base_url`), an
+  OpenAPI-conformance test that reads `reference/Connect-API.json` (Constitution II anti-stub
+  gate), and an opt-in, credential-gated UAT suite that loads a repo-local `.env` (git-ignored;
+  see `.env.example`). Added `webmock` and `dotenv` development dependencies and a `.gitleaks.toml`
+  secret-scanning config.
 - Vendored BML's published OpenAPI contract at `reference/Connect-API.json` (Connect API v2.0),
   with `reference/README.md` describing the endpoint inventory, what is out of scope, and the two
   things this gem does that the document does not describe.
@@ -24,9 +41,11 @@
   backward-compatibility statement.
 
 ### Notes
-- **No library code has changed in this release.** `BMLConnect::Client` and
-  `BMLConnect::Transactions` behave exactly as in 0.2.0. The four features above are specified,
-  not implemented.
+- Feature `001-customers-endpoints` is now **implemented**; `002`–`004` remain specified, not
+  implemented. `BMLConnect::Client` gains a memoized `#customers` plus `#logger`/`#timeout`/
+  `#max_retries`/`#retry_backoff` accessors with safe defaults; every existing method —
+  `BMLConnect::Transactions` included — keeps its 0.2.0 behavior and signature. The change is
+  purely additive.
 - `specs/004-token-charge` is **release-blocked**: it is unconfirmed whether BML's `tokenId`
   field expects a token's `id` or its `token` value. Charging the wrong identifier is a
   money-movement defect.

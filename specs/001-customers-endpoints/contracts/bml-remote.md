@@ -105,7 +105,8 @@ Operation id `get-public-customer`, summary "Get List Of Customers".
 
 **[UNVERIFIED]** — no pagination parameters are described. `Transactions#list` currently passes
 `page`, but nothing in this document confirms `/public-customers` accepts it. Do not send page
-parameters until observed. Note also `count` is typed `string`, not integer.
+parameters until observed. Note: `count` is typed `string` in the document but was **observed as
+an Integer** on UAT (2026-09-08); the library's coercion tolerates both.
 
 ---
 
@@ -114,7 +115,8 @@ parameters until observed. Note also `count` is typed `string`, not integer.
 Operation id `get-public-customers-customerid`, summary "Get A Customer Detail". Response `200`
 carries the same shape as the create response.
 
-Unknown id → **[UNVERIFIED]**; expected `404` → `NotFoundError`. Only `200` is documented.
+Unknown id → **observed `404`** with `{"message":"Customer not found","code":"PP-CU-001"}` →
+`NotFoundError` (2026-09-08). Only `200` is documented, but `404` is now confirmed live.
 
 ---
 
@@ -173,14 +175,38 @@ Observed UAT error bodies, for reference:
 
 ## Verification status
 
+**Observed live against BML UAT on 2026-09-08** (merchant "TOKEN MERCHANT 3",
+company `68c103c4addb83741e30d6a5`), via `spec/integration/customers_uat_spec.rb`.
+
 | Operation | In `Connect-API.json` | Observed on UAT |
 |---|---|---|
-| `POST /public-customers` | yes | ☐ pending credentials |
-| `GET /public-customers` | yes | ☐ pending credentials |
-| `GET /public-customers/{id}` | yes | ☐ pending credentials |
-| `PATCH /public-customers/{id}` | yes | ☐ pending credentials |
-| `DELETE /public-customers/{id}` | yes | ☐ pending credentials |
+| `POST /public-customers` | yes | ✅ `201`, returns the created record with a usable `id` |
+| `GET /public-customers` | yes | ✅ `200`, `{count, items}` envelope |
+| `GET /public-customers/{id}` | yes | ✅ `200` (known id); `404` `PP-CU-001` (unknown id) |
+| `PATCH /public-customers/{id}` | yes | ✅ `200`, partial merge confirmed (single field changed, others intact) |
+| `DELETE /public-customers/{id}` | yes | ✅ `204`, record then reports `deleted: true` |
 
-The API key in the website's development credentials is rejected by UAT (`PP-C-004`) even on the
-known-working `/public/transactions` path, so no operation has been observed live yet. A working
-UAT key is a prerequisite for closing this table — see `quickstart.md`.
+The earlier blocker (a development key rejected with `PP-C-004`) is resolved: a provisioned UAT
+key now authenticates on `/public/me` and every customer path. All five operations were exercised
+end-to-end and passed.
+
+### Live findings — document vs. actual response (resolves `[UNVERIFIED]` markers)
+
+- **`count` is an Integer**, not the `string` the document types it (observed `9`). The library's
+  tolerant coercion already handles either form; no change required.
+- **Customer responses carry both `_id` and `id`**, equal in value. The library reads `id` (per
+  the document) and it is populated. Extra Mongo/ledger fields (`_id`, `__v`, `balanceDue`,
+  `customerPayments`, `baseBalanceDue`, `lastTransactionId`, `idempotencyKey`, `source`) are
+  present but dropped by the model's whitelist — the intended security behavior.
+- **Timestamps are `createdAt`/`updatedAt`**, not the documented `created`/`updated`. The model
+  was extended to whitelist the live names (the documented names remain, in case BML aligns).
+- **Unknown-id 404 body** is `{"message":"Customer not found","code":"PP-CU-001"}` → mapped to
+  `NotFoundError`, message extracted from `message`.
+
+### Still `[UNVERIFIED]`
+
+- **List pagination parameters** — not exercised. The list works with no page parameters; whether
+  `/public-customers` accepts any (and their names) remains unobserved. Do not send them until
+  confirmed.
+- **Archive → stored-token cascade** — depends on feature `002` (tokens). Cannot be observed until
+  a customer with tokens can be created; do not assume a cascade.
