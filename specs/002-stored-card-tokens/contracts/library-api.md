@@ -84,3 +84,19 @@ The shared hierarchy from feature `001`: `ValidationError`, `AuthenticationError
 
 `ValidationError` is raised locally, before any network call, for a blank `customer_id` or
 `token_id`.
+
+### Retry on transient failures
+
+All three operations retry on `429`, `5xx`, and timeouts with bounded exponential backoff
+(delete included — soft-delete is idempotent), then raise the original `RateLimitError` or
+`AvailabilityError` once retries are exhausted. `AuthenticationError`, `NotFoundError`,
+`ConflictError`, and local `ValidationError` are never retried. A retried delete still emits a
+single audit record, written after the retries settle. Retry is a client-level, shared-transport
+behavior (see research R9), tunable at construction:
+
+```ruby
+client = BMLConnect::Client.new(max_retries: 2, retry_base: 0.2, retry_cap: 2.0)
+client = BMLConnect::Client.new(max_retries: 0)   # opt out entirely
+```
+
+A `429` carrying a `Retry-After` header honors that wait; otherwise exponential backoff applies.

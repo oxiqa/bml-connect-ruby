@@ -91,3 +91,36 @@
 
 - **Decision**: Send no query parameters on list.
 - **Rationale**: None are documented. Same reasoning as feature `001` R4.
+
+## R9. Retry and backoff on transient failures (FR-013a)
+
+- **Decision**: Retry all three operations — list, retrieve, **and delete** — on transient
+  failures, using bounded exponential backoff, then surface the original distinguishable error
+  when retries are exhausted.
+  - **Retryable**: HTTP `429`, HTTP `5xx`, and connection/read timeouts (the conditions that would
+    otherwise raise `RateLimitError` / `AvailabilityError`).
+  - **Never retried**: local `ValidationError` (never reaches the network), and non-transient
+    remote errors — `AuthenticationError`, `NotFoundError`, `ConflictError`, other `4xx`.
+  - **Delete is retried** because BML's delete is a soft delete and therefore idempotent: repeating
+    it yields the same terminal state (`204`, or a subsequent not-found/`deleted: true`), never a
+    double effect. This is the explicit choice recorded in the 2026-09-08 clarification.
+- **Defaults (library-chosen, all overridable on the client)**: max 3 attempts (2 retries), base
+  delay 0.2s, factor 2, cap 2s, with full jitter. Exposed as client options
+  (`max_retries`, `retry_base`, `retry_cap`) so an integrator can tune or disable them
+  (`max_retries: 0`). Resolves the "bounded" ambiguity by naming concrete defaults rather than
+  leaving them implicit.
+- **`Retry-After` precedence**: on a `429` that carries a `Retry-After` header (delta-seconds or
+  HTTP-date), honor it for that attempt's wait; fall back to exponential backoff when the header is
+  absent or unparseable. A server-stated wait is more accurate than a guess.
+- **Audit interaction**: a retried delete emits exactly **one** audit record, written after the
+  retry sequence settles, capturing the final outcome (success after N attempts, or the terminal
+  error). No per-attempt audit records — the audit answers "did this deletion happen", not "how
+  many times did we ask" (FR-013a × FR-014).
+- **Placement**: retry belongs in the shared transport introduced by feature `001`, applied
+  uniformly to every resource and configured once on `Client`. This feature adds no bespoke retry
+  code. If that transport does not yet retry, adding it is a shared-infrastructure change, not a
+  tokens-only one.
+- **Alternatives considered**: retry reads only and surface delete immediately (rejected — the
+  clarification chose to retry all three, and soft-delete idempotency makes it safe); no retry at
+  all, caller owns the policy (rejected — FR-013a mandates it); per-resource retry logic (rejected
+  — Constitution V, one implementation in the shared layer over three copies).

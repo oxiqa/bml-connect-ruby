@@ -54,6 +54,11 @@ end
 An empty list and an auth failure are deliberately different outcomes (research R6). Never
 rescue the latter into the former.
 
+Transient failures (`429`, timeout, `5xx`) are retried automatically with bounded exponential
+backoff before the error surfaces — on all three operations, delete included. Tune or disable it
+on the client (`max_retries:`, `retry_base:`, `retry_cap:`); see `contracts/library-api.md` and
+research R9.
+
 ## Running the tests
 
 ```bash
