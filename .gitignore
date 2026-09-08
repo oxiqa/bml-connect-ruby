@@ -9,3 +9,9 @@
 
 # rspec failure tracking
 .rspec_status
+
+# Local UAT credentials — repo-local only, never commit.
+# Used solely by spec/integration against BML UAT. See .env.example.
+.env
+.env.*
+!.env.example
