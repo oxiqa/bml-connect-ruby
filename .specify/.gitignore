@@ -1,0 +1,5 @@
+# Local pointer to the current feature directory.
+feature.json
+
+# Per-machine extension config overrides.
+extensions/*/local-config.yml

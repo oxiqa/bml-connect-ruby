@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Show or switch the active Spec Kit feature.
+#
+#   ./speckit-feature            # show current + status of every feature
+#   ./speckit-feature 002        # switch to the feature starting with 002
+#   ./speckit-feature 002-card-on-file-endpoints
+#
+# Spec Kit resolves the active feature from .specify/feature.json.
+# /speckit.specify rewrites that pointer to each newly created feature,
+# which is why plan/tasks always target the most recent spec.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fj="$root/.specify/feature.json"
+
+current() { sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$fj" 2>/dev/null; }
+
+if [ $# -eq 0 ]; then
+  cur="$(current)"
+  printf 'active: %s\n\n' "${cur:-<unset>}"
+  printf '%-34s %-7s %-9s %-6s %-6s\n' FEATURE SPEC CLARIFY PLAN TASKS
+  for d in "$root"/specs/*/; do
+    n="$(basename "$d")"
+    row="$(printf '%-34s' "$n")"
+    add() { [ "$1" = y ] && row="$row$(printf '%-*s' "$2" ' yes')" || row="$row$(printf '%-*s' "$2" ' -')"; }
+    [ -e "$d/spec.md" ] && add y 7 || add n 7
+    grep -qi '^## Clarifications' "$d/spec.md" 2>/dev/null && add y 9 || add n 9
+    [ -e "$d/plan.md" ]  && add y 6 || add n 6
+    [ -e "$d/tasks.md" ] && add y 6 || add n 6
+    [ "specs/$n" = "$cur" ] && row="$row  <- active"
+    printf '%s\n' "$row"
+  done
+  exit 0
+fi
+
+match="$(cd "$root/specs" && ls -d "$1"* 2>/dev/null | head -1 || true)"
+[ -n "$match" ] || { echo "ERROR: no feature under specs/ matching '$1'" >&2; exit 1; }
+
+printf '{"feature_directory":"specs/%s"}' "$match" > "$fj"
+echo "active: specs/$match"
