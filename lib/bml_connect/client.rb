@@ -3,6 +3,7 @@
 require 'faraday'
 require 'faraday_middleware'
 require 'deep_merge/rails_compat'
+require 'logger'
 
 module BMLConnect
   class Client
@@ -12,14 +13,33 @@ module BMLConnect
     BML_SANDBOX_ENDPOINT = "https://api.uat.merchants.bankofmaldives.com.mv/public/"
     BML_PRODUCTION_ENDPOINT = "https://api.merchants.bankofmaldives.com.mv/public/"
 
-    attr_reader(:api_key, :http_client, :transactions)
+    DEFAULT_TIMEOUT = 30
+    DEFAULT_MAX_RETRIES = 2
+    DEFAULT_RETRY_BACKOFF = 0.5
+
+    attr_reader(:api_key, :app_id, :mode, :http_client, :transactions, :logger)
+    attr_accessor(:timeout, :max_retries, :retry_backoff)
 
     def initialize(api_key: nil, app_id: nil, mode: nil, options: {})
       @api_key = api_key || (defined?(BML_API_KEY) ? BML_API_KEY : 'not-set')
       @app_id = app_id || (defined?(BML_APP_ID) ? BML_APP_ID : 'not-set')
       @mode = mode || (defined?(BML_MODE) ? BML_MODE : 'production')
-      @http_client = initialize_http_client(options)
+
+      # Pull the customers-resource knobs out of options before the rest is
+      # handed to Faraday, which would reject unknown keys.
+      opts = options.dup
+      @logger = opts.key?(:logger) ? opts.delete(:logger) : default_logger
+      @timeout = opts.key?(:timeout) ? opts.delete(:timeout) : DEFAULT_TIMEOUT
+      @max_retries = opts.key?(:max_retries) ? opts.delete(:max_retries) : DEFAULT_MAX_RETRIES
+      @retry_backoff = opts.key?(:retry_backoff) ? opts.delete(:retry_backoff) : DEFAULT_RETRY_BACKOFF
+
+      @http_client = initialize_http_client(opts)
       @transactions = Transactions.new(self)
+    end
+
+    # Memoized customers resource, bound to this client's mode and credentials.
+    def customers
+      @customers ||= Customers.new(self)
     end
 
     def base_url
@@ -44,6 +64,15 @@ module BMLConnect
     end
 
     private
+
+    # Default audit/diagnostic logger. Emits masked structured lines to stdout;
+    # integrators can inject their own via `options: { logger: ... }`.
+    def default_logger
+      logger = Logger.new($stdout)
+      logger.progname = 'bml_connect'
+      logger
+    end
+
     def initialize_http_client(options)
       defaults = {
         url: base_url,
