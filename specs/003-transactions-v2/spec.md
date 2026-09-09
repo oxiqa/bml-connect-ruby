@@ -12,6 +12,19 @@
 
 ## Clarifications
 
+### Session 2026-09-08
+
+- Q: Should the `capture` amount obey the same validation rule as create? → A: Yes — capture
+  `amount` obeys the exact FR-005 rule (positive Integer in minor units; reject Float, String,
+  zero, and negative), rejected locally naming the field with no remote call.
+- Q: Should the deprecated legacy v1 create emit a runtime deprecation warning? → A: Yes — a
+  single structured warning emitted at most once per process (deduplicated), in addition to the
+  documentation notice. A warning is not a failure, so SC-005 (website passes unchanged) holds.
+- Q: Which operations get a new value-object method? → A: The full parallel set — create, get,
+  update, capture, and cancel each gain a new value-object method, giving integrators one
+  consistent modern surface while the existing six methods keep their `Faraday::Response` return
+  type unchanged.
+
 ### Session 2026-09-07
 
 - Q: Does the existing `POST public/transactions` create endpoint still work? → A: Yes — UAT
@@ -176,14 +189,18 @@ that will not proceed.
   `PATCH /public/transactions/{transactionId}` with any of `customerReference`, `localData`,
   `pnr`, sending only supplied keys.
 - **FR-008**: The library MUST allow capture via
-  `POST /public/transactions/{transactionId}/capture` with `id` and `amount`.
+  `POST /public/transactions/{transactionId}/capture` with `id` and `amount`. The `amount` MUST
+  satisfy the same rule as FR-005 — a positive Integer in minor units, rejecting a Float, a
+  String, zero, or a negative value, naming the field, with no remote call.
 - **FR-009**: The library MUST allow cancellation via
   `POST /public/transactions/{transactionId}/cancel`.
 - **FR-010**: The library MUST NOT remove, rename, or change the return type or signature of the
   existing `transactions.create`, `transactions.get`, or `transactions.list`. Six production call
   sites in `msgowl/website` depend on them.
 - **FR-011**: The existing v1 create MUST be marked deprecated in documentation, with a pointer
-  to the v2 method, while continuing to work.
+  to the v2 method, while continuing to work. It MUST also emit a single structured runtime
+  deprecation warning, deduplicated to at most once per process, that does not alter behavior or
+  return value (a warning is not a failure, preserving SC-005).
 - **FR-012**: The library MUST NOT send a `signature` field on v2 requests until UAT observation
   establishes whether v2 requires, ignores, or rejects one. It MUST continue sending it on v1.
 - **FR-013**: The library MUST authenticate using the raw `Authorization` API key — no `Bearer`,
@@ -195,9 +212,20 @@ that will not proceed.
 - **FR-016**: Automatic retry MUST NOT be applied to transaction creation. Retry is safe only
   with a server-side idempotency guarantee, and none is documented for this endpoint. Retrieve,
   list, and cancel MAY retry.
-- **FR-017**: Create, capture, and cancel MUST emit audit records. Retrieve and list are not
-  audited.
+- **FR-017**: Create, capture, cancel, and update MUST emit audit records. Retrieve and list are
+  not audited.
 - **FR-018**: Every operation MUST be independently testable against UAT.
+- **FR-019**: The library MUST expose the richer value-object surface as a full parallel set of
+  new methods — one each for create, get, update, capture, and cancel — returning value objects
+  (carrying fields such as `id`, `state`, the hosted payment URL, `paddedCardNumber`,
+  `merchantId`, and `provider` where present). These are additive and MUST NOT alter the existing
+  `create`, `get`, or `list` methods, which keep their `Faraday::Response` return type (FR-010).
+- **FR-020**: In addition to variant 3 (attach an existing `customerId`), the library MUST support
+  the inline-customer create variant (variant 4), supplying a `customer` object with `name` and
+  `email`. `customerId` and inline `customer` are mutually exclusive; supplying both, or an inline
+  `customer` missing `name` or `email`, MUST be rejected locally naming the field, with no remote
+  call. Create variants 1, 2 (shop orders) and 5 (foreign exchange) remain out of scope and MUST
+  be rejected by name.
 
 ### Key Entities *(include if feature involves data)*
 

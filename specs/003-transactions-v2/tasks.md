@@ -56,7 +56,7 @@ miss.
 - [ ] T009 [P] [US1] Write `spec/contract/transactions_v2_remote_spec.rb` (failing): `POST #{client.base_url}public/v2/transactions`, raw `Authorization`, no `Bearer`, no `X-App-Id`, **no `signature` field**; maps 201 → `TransactionRecord`; error mapping
 - [ ] T010 [P] [US1] Write a failing spec asserting **create is never auto-retried** (SC-007): simulate a timeout, assert exactly one HTTP attempt was made
 - [ ] T011 [US1] Implement `Transactions#create_v2(details, actor: nil)`
-- [ ] T012 [US1] Add a one-time deprecation warning to the existing `create`, naming `create_v2`. **Behavior otherwise unchanged** — T001 must stay green
+- [ ] T012 [US1] Add a **single structured deprecation warning, deduplicated to at most once per process** (FR-011), to the existing `create`, naming `create_v2`. **Behavior, return value, and request otherwise unchanged** — T001 and the `msgowl/website` gate (T029) must stay green. Include a spec asserting the warning fires once and does not fire on a second call
 - [ ] T013 [P] [US1] Write `spec/integration/transactions_v2_uat_spec.rb` (opt-in, gated)
 
 **Checkpoint**: v2 create works; v1 untouched.
@@ -86,16 +86,16 @@ miss.
 
 ## Phase 6: User Story 4 — Update (P3)
 
-- [ ] T023 [P] [US4] Write update unit + contract specs (failing): `PATCH …public/transactions/{id}`; only `customerReference`, `localData`, `pnr` accepted; **only supplied keys sent, no nulls**; empty changes rejected
-- [ ] T024 [US4] Implement `Transactions#update(id, changes, actor: nil)`
+- [ ] T023 [P] [US4] Write update unit + contract specs (failing): `PATCH …public/transactions/{id}`; only `customerReference`, `localData`, `pnr` accepted; **only supplied keys sent, no nulls**; empty changes rejected; **audit record emitted** (FR-017)
+- [ ] T024 [US4] Implement `Transactions#update(id, changes, actor: nil)`, returning a `TransactionRecord` value object (FR-019) and emitting an audit record (FR-017)
 
 ---
 
 ## Phase 7: User Story 5 — Capture and cancel (P3)
 
-- [ ] T025 [P] [US5] Write capture unit + contract specs (failing): `POST …/{id}/capture` with `id` and `amount`; `amount` a positive Integer; **capture is never auto-retried**; audit emitted
+- [ ] T025 [P] [US5] Write capture unit + contract specs (failing): `POST …/{id}/capture` with `id` and `amount`; `amount` validated under the **same rule as `create_v2` (FR-008/FR-005)** — positive Integer in minor units, **Float, String, zero, and negative each rejected by name with no remote call**; **capture is never auto-retried**; audit emitted
 - [ ] T026 [P] [US5] Write cancel unit + contract specs (failing): `POST …/{id}/cancel`, no body; audit emitted
-- [ ] T027 [US5] Implement `Transactions#capture(id, amount:, actor: nil)` and `#cancel(id, actor: nil)`
+- [ ] T027 [US5] Implement `Transactions#capture(id, amount:, actor: nil)` and `#cancel(id, actor: nil)`, both returning a `TransactionRecord` value object (FR-019). Reuse the `create_v2` amount validator for capture (FR-008)
 - [ ] T028 [US5] **Resolve `[UNVERIFIED]` #4**: what the body `id` on capture refers to
 
 ---
@@ -103,7 +103,7 @@ miss.
 ## Phase 8: Polish & Verification
 
 - [ ] T029 **Run the `msgowl/website` test suite against this gem via a local path override and confirm zero changes are needed** (SC-005). This is the release gate for the whole feature
-- [ ] T030 Close the verification table in `contracts/bml-remote.md`; resolve or re-scope all six `[UNVERIFIED]` items
+- [ ] T030 Close the verification table in `contracts/bml-remote.md`: (a) demonstrate **every operation** — create_v2, retrieve, update, capture, cancel — against UAT and record the observed response, satisfying FR-018 and SC-004 (not only the create/tokenization paths of T013/T017); (b) resolve or re-scope all six `[UNVERIFIED]` items
 - [ ] T031 [P] Update the gem `README.md`: v2 create, tokenization, and a clear deprecation notice on v1 `create`
 - [ ] T032 [P] Add a `CHANGELOG.md` entry under `[Unreleased]`
 - [ ] T033 [P] Run `bundle exec rubocop`

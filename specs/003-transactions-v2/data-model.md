@@ -28,7 +28,9 @@ pre-existing; renaming the old class would break `transactions.create`.
 | `externalImport` | boolean | platform | |
 | `externalId` | string | platform | |
 | `localId` | string | caller | The integrator's own reference — **the reconciliation key** |
-| `customerReference` | string | caller | |
+| `customerReference` | string | caller | Amendable via `update` (FR-007) |
+| `localData` | object | caller | Amendable via `update` (FR-007) |
+| `pnr` | string | caller | Amendable via `update` (FR-007) |
 | `paymentToken` | string | platform | |
 | `history` | array | platform | `[{state, updatedDate, trigger}]` |
 | `redirectUrl` | string | both | Sent as a request field; echoed back |
@@ -99,6 +101,9 @@ Ordered: variant selection → presence → type → conditional tokenization ru
 | `recurringFrequency` present + valid when `RECURRING` | `:recurringFrequency` |
 | `expiryDate` present, `yyyy-mm-dd`, future when `RECURRING` | `:expiryDate` |
 | No value matches a PAN pattern | varies |
+
+**Capture** applies the same `amount` rule as create — positive Integer, minor units; reject
+Float, String, zero, negative → `:amount`, no remote call (FR-008).
 
 ## Lifecycle
 

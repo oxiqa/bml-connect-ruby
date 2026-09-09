@@ -157,6 +157,9 @@ Note `id` is required in the body *and* the transaction id is in the path. **[UN
 whether the body `id` is the transaction id repeated or something else. Documented response:
 `2XX` (a range, not a specific code).
 
+The library validates `amount` locally before sending, under the same positive-Integer/minor-units
+rule as create (FR-008) — a Float, String, zero, or negative is rejected with no remote call.
+
 ---
 
 ## Cancel — `POST /public/transactions/{transactionId}/cancel`

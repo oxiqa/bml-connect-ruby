@@ -119,7 +119,10 @@ client.transactions.capture("txn_…", amount: 10_000)   # => Transaction
 client.transactions.cancel("txn_…")                    # => Transaction
 ```
 
-Both emit audit records. `capture` validates `amount` as a positive Integer.
+Both emit audit records. `capture` validates `amount` under the **same rule as `create_v2`**
+(FR-005/FR-008): a positive Integer in minor units, rejecting a Float, a String, zero, or a
+negative value with `ValidationError(field: :amount)` and **no remote call**. Capture moves money,
+so it is never auto-retried (FR-016).
 
 ## Out of scope
 
@@ -130,7 +133,7 @@ rather than sending a body BML will reject.
 
 ## Value object
 
-### `BMLConnect::Models::Transaction`
+### `BMLConnect::Models::TransactionRecord`
 
 Whitelisted:
 
@@ -140,7 +143,12 @@ provider  providerHistory  state  accountingState  qr  securityWord
 canRefundIfConfirmed  externalImport  externalId  localId  paymentToken
 history  appVersion  apiVersion  redirectUrl  costStructure
 providerDisplayName  paddedCardNumber  customerId
+customerReference  localData  pnr
 ```
+
+`customerReference`, `localData` and `pnr` are the fields `update` can change (FR-007); they are
+whitelisted so a caller can read back the result of an update rather than treating them as
+write-only.
 
 Plus `#payment_url` (see caveat) and `#tokenized?`.
 

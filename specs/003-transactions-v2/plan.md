@@ -1,6 +1,6 @@
 # Implementation Plan: Transactions V2
 
-**Branch**: `003-transactions-v2` | **Date**: 2026-09-07 | **Spec**: [spec.md](./spec.md)
+**Branch**: `003-transactions-v2` | **Date**: 2026-09-07 (reconciled 2026-09-08) | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/003-transactions-v2/spec.md`
 
@@ -68,6 +68,20 @@ See [research.md](./research.md).
 - [quickstart.md](./quickstart.md)
 
 **Post-Design Constitution Check: PASS**.
+
+**2026-09-08 clarification reconciliation** — three spec clarifications were checked against the
+existing design; no re-architecture required:
+
+- **FR-008 (capture amount)**: capture now validates `amount` under the identical FR-005 rule
+  (positive Integer, minor units; reject Float/String/zero/negative, no remote call). Design
+  updated in `data-model.md`, `contracts/library-api.md`, `contracts/bml-remote.md`.
+- **FR-011 (v1 deprecation warning)**: the one-time, deduplicated runtime warning was already
+  specified in `contracts/library-api.md`, `research.md` R2, and `quickstart.md` — no change.
+- **FR-019 (full parallel value-object surface)**: `create_v2`, `retrieve`, `update`, `capture`,
+  `cancel` were already the planned surface (`research.md` R1) — no change.
+
+`tasks.md` predates these clarifications; run `/speckit-tasks` (or `/speckit-analyze`) to fold the
+strengthened capture-amount validation into the task list before implementing.
 
 ## Phase 2 — Tasks
 
