@@ -32,7 +32,7 @@ renewal = client.transactions.create_v2(
   customerId: customer.id, localId: "SUB-2026-10"
 )
 
-charged = client.tokens.charge(
+charged = client.customers.charge(
   customer_id:    customer.id,
   transaction_id: renewal.id,
   token_id:       token.id
@@ -48,7 +48,7 @@ Steps 1–3 happen once. Step 4 repeats for every renewal.
 Every charge needs a transaction to charge. The library will not do both for you:
 
 ```ruby
-client.tokens.charge_new(amount: 10_000, ...)   # NoMethodError — deliberately absent
+client.customers.charge_new(amount: 10_000, ...)   # NoMethodError — deliberately absent
 ```
 
 Hiding a transaction creation inside a method called `charge` would obscure a money movement and
@@ -61,7 +61,7 @@ different transaction.
 
 ```ruby
 begin
-  charged = client.tokens.charge(customer_id: customer.id,
+  charged = client.customers.charge(customer_id: customer.id,
                                  transaction_id: renewal.id,
                                  token_id: token.id)
 
@@ -94,7 +94,7 @@ retrieving the transaction.
 ## Running the tests
 
 ```bash
-bundle exec rspec spec/unit/tokens_charge_spec.rb spec/contract/tokens_charge_remote_spec.rb
+bundle exec rspec spec/unit/customers_charge_spec.rb spec/contract/customers_charge_remote_spec.rb
 ```
 
 ## Verifying against UAT
@@ -108,7 +108,7 @@ export BML_ENV=sandbox
 export BML_CUSTOMER_ID=<customer with a stored card>
 export BML_TOKEN_ID=<their token id>
 
-bundle exec rspec spec/integration/tokens_charge_uat_spec.rb --format documentation
+bundle exec rspec spec/integration/customers_charge_uat_spec.rb --format documentation
 ```
 
 ### Resolving the blocker

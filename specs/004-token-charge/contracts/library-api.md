@@ -4,10 +4,11 @@
 
 ## Reaching the resource
 
-The charge lives on the tokens resource, since it charges a token:
+The charge lives on the customers resource, matching its endpoint `POST /public-customers/charge`
+(the `Customers` resource already owns the `/public-customers` path family):
 
 ```ruby
-client.tokens.charge(...)
+client.customers.charge(...)
 ```
 
 ## The two-step flow
@@ -25,7 +26,7 @@ txn = client.transactions.create_v2(
 )
 
 # 2. charge the stored card against it
-charged = client.tokens.charge(
+charged = client.customers.charge(
   customer_id:    "cus_123",
   transaction_id: txn.id,
   token_id:       "tok_789"
@@ -34,7 +35,7 @@ charged = client.tokens.charge(
 charged.state      # resolved synchronously — no cardholder redirect
 ```
 
-There is deliberately no `client.tokens.charge_new(amount:, …)`. A single method hiding a
+There is deliberately no `client.customers.charge_new(amount:, …)`. A single method hiding a
 transaction creation behind a name like "charge" would obscure a money-moving side effect, and a
 partial failure between the two steps would be invisible.
 
@@ -60,7 +61,7 @@ Returns `BMLConnect::Models::TransactionRecord` (feature `003`).
 
 ```ruby
 begin
-  charged = client.tokens.charge(customer_id: "cus_123",
+  charged = client.customers.charge(customer_id: "cus_123",
                                  transaction_id: txn.id, token_id: "tok_789")
 rescue BMLConnect::AvailabilityError => e
   # EXACTLY ONE attempt was made. The charge may or may not have been applied.
@@ -76,7 +77,7 @@ safe recovery is to look the transaction up.
 ### Decline vs. outage
 
 ```ruby
-charged = client.tokens.charge(...)      # returned => BML answered
+charged = client.customers.charge(...)      # returned => BML answered
 case charged.state
 when "CONFIRMED" then settle!
 else                  dun_customer!      # a decline: do not blindly retry

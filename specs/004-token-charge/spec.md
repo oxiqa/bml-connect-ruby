@@ -12,6 +12,12 @@ exist. See [MIGRATION.md](../../MIGRATION.md).
 
 ## Clarifications
 
+### Session 2026-09-09
+
+- Q: Which public surface should expose the charge operation? → A: `client.customers.charge` —
+  the existing `Customers` resource gains a `charge` method, matching the `/public-customers`
+  path prefix. No dedicated charges/tokens/transactions method is added.
+
 ### Session 2026-09-07
 
 - Q: How does a merchant charge a stored card? → A: `POST /public-customers/charge` with
@@ -100,8 +106,8 @@ loses revenue. Equal in priority to the charge itself.
 
 ### Functional Requirements
 
-- **FR-001**: The library MUST expose a charge operation for stored tokens via
-  `POST /public-customers/charge`.
+- **FR-001**: The library MUST expose a charge operation for stored tokens as `charge` on the
+  `Customers` resource (`client.customers.charge`), calling `POST /public-customers/charge`.
 - **FR-002**: The library MUST require `customerId`, `transactionId` and `tokenId`, validating
   all three are present and non-blank before any remote call.
 - **FR-003**: The library MUST NOT expose any operation that creates a transaction and charges it

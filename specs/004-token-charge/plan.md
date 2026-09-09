@@ -1,6 +1,6 @@
 # Implementation Plan: Token Charge
 
-**Branch**: `004-token-charge` | **Date**: 2026-09-07 | **Spec**: [spec.md](./spec.md)
+**Branch**: `004-token-charge` | **Date**: 2026-09-07 (reconciled 2026-09-09 to the FR-001 clarification: the charge lives on the `Customers` resource) | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/004-token-charge/spec.md`
 
@@ -75,15 +75,16 @@ See [tasks.md](./tasks.md).
 
 ```
 lib/bml_connect/
-  tokens.rb                (modified — add #charge)
+  customers.rb             (modified — add #charge)
 
 spec/
-  unit/tokens_charge_spec.rb
-  contract/tokens_charge_remote_spec.rb
-  integration/tokens_charge_uat_spec.rb
+  unit/customers_charge_spec.rb
+  contract/customers_charge_remote_spec.rb
+  integration/customers_charge_uat_spec.rb
 ```
 
-No new files beyond specs. The operation is one method on the existing `Tokens` resource,
+No new files beyond specs. The operation is one method on the existing `Customers` resource
+(whose `PATH` is already `/public-customers`, so the charge posts to `"#{PATH}/charge"`),
 returning a model feature `003` already defines.
 
 ## Release gate

@@ -4,8 +4,8 @@
 
 ## R1. The charge is two calls, and stays two calls
 
-- **Decision**: The library exposes `tokens.charge(customer_id:, transaction_id:, token_id:)`
-  and **no** combined create-and-charge convenience.
+- **Decision**: The library exposes `customers.charge(customer_id:, transaction_id:, token_id:)`
+  (see R8) and **no** combined create-and-charge convenience.
 - **Rationale**: `POST /public-customers/charge` requires an existing `transactionId`. A caller
   must therefore create a transaction first. A helper hiding both behind one call would (a)
   obscure a money-moving side effect behind a name that does not mention it, and (b) leave a
@@ -90,10 +90,20 @@
 
 ## R8. Where the method lives
 
-- **Decision**: `client.tokens.charge`, not `client.transactions.charge`.
-- **Rationale**: The endpoint sits under `/public-customers`, and the operation's subject is the
-  stored token — it is the only thing in the request that is not merely an addressing id. The
-  return type being a transaction does not make it a transaction operation.
-- **Alternatives considered**: `client.transactions.charge` (rejected — matches the return type
-  rather than the subject and the path); a standalone `client.charges` resource (rejected — one
-  method does not warrant a resource, and BML has no charges collection).
+- **Decision**: `client.customers.charge`. *(Revised by the 2026-09-09 clarification — see spec
+  FR-001. The original draft chose `client.tokens.charge`; that is now a rejected alternative
+  below.)*
+- **Rationale**: The endpoint is literally `POST /public-customers/charge`, and resource classes
+  in this library map to their path family: `Customers` already owns `PATH = "/public-customers"`,
+  so the charge posts to `"#{PATH}/charge"` with no new addressing. Reusing the existing resource
+  avoids introducing a class or method whose home contradicts the path, and keeps SC-007's
+  "assert the resource's public method list" check pointed at one obvious resource. Simplicity
+  (Constitution V) favours not spreading a single money-moving method onto a resource chosen by
+  subject when the path already names its home.
+- **Alternatives considered**:
+  - `client.tokens.charge` (the original draft decision, rejected on 2026-09-09 — it placed the
+    method by the operation's *subject* (the stored token) rather than by the endpoint path; the
+    clarification chose path-fidelity and reuse of the existing `Customers` resource instead).
+  - `client.transactions.charge` (rejected — matches the return type rather than the path).
+  - A standalone `client.charges` resource (rejected — one method does not warrant a resource,
+    and BML has no charges collection).

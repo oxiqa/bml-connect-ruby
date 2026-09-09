@@ -75,7 +75,7 @@ on a charge response.
 The distinction callers depend on (FR-007):
 
 ```
-client.tokens.charge(...)
+client.customers.charge(...)
         │
         ├── returns a TransactionRecord ────► BML answered. A BUSINESS outcome.
         │        ├── state = success  ──────► settle
