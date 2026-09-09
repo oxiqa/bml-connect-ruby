@@ -73,6 +73,23 @@ RSpec.describe "OpenAPI conformance" do
     end
   end
 
+  describe "the charge path the Customers resource can emit (feature 004)" do
+    let(:charge_path) { "#{BMLConnect::Customers::PATH}/charge" }
+
+    it "declares POST /public-customers/charge" do
+      expect(doc["paths"]).to have_key(charge_path)
+      expect(doc["paths"][charge_path]).to have_key("post")
+    end
+
+    it "requires exactly customerId, transactionId, tokenId in the request body" do
+      schema = doc.dig("paths", charge_path, "post", "requestBody", "content", "application/json", "schema")
+      schema = doc.dig(*schema["$ref"].sub("#/", "").split("/")) if schema.is_a?(Hash) && schema["$ref"]
+
+      expect(schema["required"]).to contain_exactly("customerId", "transactionId", "tokenId")
+      expect(schema["properties"].keys).to contain_exactly("customerId", "transactionId", "tokenId")
+    end
+  end
+
   describe "authentication scheme" do
     let(:scheme) { doc.dig("components", "securitySchemes", "Authorization") }
     let(:client) { build_client }
