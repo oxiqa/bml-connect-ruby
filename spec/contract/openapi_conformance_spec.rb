@@ -44,6 +44,35 @@ RSpec.describe "OpenAPI conformance" do
     end
   end
 
+  describe "paths the Transactions v2 surface can emit" do
+    it "declares the documented v2 create path" do
+      expect(doc["paths"]).to have_key(BMLConnect::Transactions::V2_CREATE_PATH)
+    end
+
+    it "declares the retrieve/update path template" do
+      expect(doc["paths"]).to have_key("#{BMLConnect::Transactions::BASE_PATH}/{transactionId}")
+    end
+
+    it "declares the capture path template" do
+      expect(doc["paths"]).to have_key("#{BMLConnect::Transactions::BASE_PATH}/{transactionId}/capture")
+    end
+
+    it "declares the cancel path template" do
+      expect(doc["paths"]).to have_key("#{BMLConnect::Transactions::BASE_PATH}/{transactionId}/cancel")
+    end
+
+    # ALLOW-LISTED EXCEPTION (visible, not hidden — Constitution III intent).
+    # The legacy v1 create path `POST /public/transactions` (collection root, no
+    # {transactionId}) is NOT in the published document, yet carries all current
+    # production traffic and is deliberately kept alive and deprecated
+    # (FR-010/FR-011, plan Complexity Tracking, contracts/bml-remote.md). This
+    # assertion documents that the absence is known and intentional: if BML ever
+    # publishes the endpoint, this test flips and we revisit the deprecation.
+    it "records that the legacy v1 create path is undocumented (known exception)" do
+      expect(doc["paths"]).not_to have_key(BMLConnect::Transactions::BASE_PATH)
+    end
+  end
+
   describe "authentication scheme" do
     let(:scheme) { doc.dig("components", "securitySchemes", "Authorization") }
     let(:client) { build_client }

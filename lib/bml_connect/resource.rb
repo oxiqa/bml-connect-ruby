@@ -24,16 +24,32 @@ module BMLConnect
 
     # Dispatch +method+ to +path+ (a host-root path like "/public-customers").
     # Returns the Faraday response on 2xx; raises a mapped error otherwise.
-    def request(method, path, body: nil)
+    #
+    # +retries+ defaults to true (bounded retry with backoff on transient
+    # failures). Pass +retries: false+ for money-moving calls that MUST make
+    # exactly one attempt — transaction create and capture (FR-016): retry there
+    # risks a double charge, and no server-side idempotency key is documented.
+    def request(method, path, body: nil, retries: true)
       url = request_url(path)
 
-      response = with_retries do
+      dispatch = lambda do
         client.http_client.public_send(method, url) do |req|
           req.body = JSON.generate(body) if body
         end
       end
 
+      response = retries ? with_retries(&dispatch) : single_attempt(&dispatch)
+
       handle(response)
+    end
+
+    # Exactly one attempt, no retry. A transport failure becomes an
+    # AvailabilityError immediately so the caller can reconcile rather than
+    # blindly re-send (FR-016, SC-007).
+    def single_attempt
+      yield
+    rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
+      raise AvailabilityError, e.message
     end
 
     # Customer paths live at the host root ("/public-customers"), NOT under the

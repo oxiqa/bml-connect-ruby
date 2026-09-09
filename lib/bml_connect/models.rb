@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require 'bml_connect/models/transaction'
+require 'bml_connect/models/transaction_record'
+require 'bml_connect/models/tokenization_details'
 require 'bml_connect/models/customer'
 require 'bml_connect/models/customer_list'
 require 'bml_connect/models/token'

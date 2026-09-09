@@ -45,4 +45,11 @@ module BMLConnect
   # Timeout, connection failure, 408, or 5xx after bounded retries. Distinct
   # from every other error so callers can safely retry later.
   class AvailabilityError < Error; end
+
+  # Raised when a value the caller asks for depends on a response field that is
+  # not yet verified against a live BML environment. Specifically:
+  # TransactionRecord#payment_url raises this when no hosted-payment-URL field is
+  # present, rather than returning nil and sending a cardholder to a blank page
+  # (contracts/bml-remote.md [UNVERIFIED] #1; research R7).
+  class UnverifiedFieldError < Error; end
 end
