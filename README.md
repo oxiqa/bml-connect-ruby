@@ -199,6 +199,50 @@ Notes:
   retry_backoff: 0.5 })`; set `max_retries: 0` to disable. A `429`'s `Retry-After` is surfaced on
   `RateLimitError#retry_after`.
 
+### Charging a stored card
+
+Once a customer has a stored card (a token), you can take a payment from it with no cardholder
+present — a subscription renewal, an account top-up, an ad-hoc charge. It is a **two-call flow**,
+and the gem keeps it that way on purpose: BML has no single endpoint that creates a transaction
+and charges it, so this gem offers none either (a hidden combined call would obscure a money
+movement). The **amount lives on the transaction**, not on the charge.
+
+```ruby
+# 1 ── create the transaction to be charged (the amount lives HERE)
+renewal = client.transactions.create_v2(
+  amount: 10_000, currency: "MVR",       # MVR 100.00, in minor units
+  customerId: "cus_123", localId: "SUB-2026-10"
+)
+
+# 2 ── charge the stored card against it
+charged = client.customers.charge(
+  customer_id:    "cus_123",
+  transaction_id: renewal.id,
+  token_id:       "tok_789",             # the stored card's Token#id
+  actor:          "billing:cron"          # optional, for the audit "who"
+)
+
+charged.state    # resolved synchronously — no cardholder redirect
+```
+
+Notes:
+
+- **Returned vs. raised.** A **returned** `TransactionRecord` means BML answered — inspect
+  `charged.state` for the business outcome (a decline is a returned record, not an exception). A
+  **raised** error means BML did not answer. The gem never converts one into the other, so a
+  declined card and a network outage are always distinguishable.
+- **Never auto-retried.** The charge schema carries no idempotency key, so a retry could take
+  payment twice. Exactly one HTTP attempt is made. On a timeout, an `AvailabilityError` is raised
+  whose message **names the `transaction_id`** — reconcile by retrieving that transaction
+  (`client.transactions.retrieve(id)`) rather than re-charging blindly.
+- **No `amount` on the charge.** To bill a different amount, create a different transaction.
+- **Audited, failures included.** Every charge emits a masked audit line — success, decline,
+  validation failure, and availability failure alike — carrying the transaction and token ids and
+  never any card data.
+- **⚠️ Release-blocked.** It is not yet confirmed against a live environment whether `token_id`
+  expects `Token#id` or `Token#token`. `Token#id` is the current inference; do not rely on this in
+  production until it is verified (see `specs/004-token-charge/`).
+
 ## Roadmap
 
 Tokenization support is moving into this gem. It was previously being built as a separate
@@ -214,7 +258,7 @@ disagree, the document wins.
 | [`001-customers-endpoints`](specs/001-customers-endpoints/) | `/public-customers` | Implemented (pending live UAT verification) |
 | [`002-stored-card-tokens`](specs/002-stored-card-tokens/) | `/public-customers/{id}/tokens` | Implemented (pending live UAT verification) |
 | [`003-transactions-v2`](specs/003-transactions-v2/) | `/public/v2/transactions` | Specified |
-| [`004-token-charge`](specs/004-token-charge/) | `/public-customers/charge` | Specified, release-blocked |
+| [`004-token-charge`](specs/004-token-charge/) | `/public-customers/charge` | Implemented, release-blocked (pending live UAT: `tokenId` identity) |
 
 Each feature directory carries a `spec.md`, `plan.md`, `research.md`, `data-model.md`, `tasks.md`
 and two contracts — one for the BML HTTP surface, one for the Ruby surface this gem exposes.

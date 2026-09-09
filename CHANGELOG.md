@@ -1,6 +1,23 @@
 ## [Unreleased]
 
 ### Added
+- **Stored-card charge** (`client.customers.charge`), implementing feature `004-token-charge` on
+  the documented `POST /public-customers/charge` endpoint. Takes `customer_id:`, `transaction_id:`
+  and `token_id:` (all required, validated locally by name before any remote call) plus an optional
+  `actor:`, and returns a `BMLConnect::Models::TransactionRecord`. Highlights:
+  - **Two-call flow, kept two calls.** No combined create-and-charge method exists (test-enforced);
+    the transaction is created first (`create_v2`) and supplies the amount — the charge carries no
+    `amount` of its own.
+  - **Never auto-retried** — the charge schema has no idempotency key, so exactly one HTTP attempt
+    is made; a timeout/transport failure raises `AvailabilityError` whose message names the
+    `transaction_id` for reconciliation by retrieval.
+  - **Returned vs. raised** are never conflated: a returned record (including a decline in a failed
+    `state`) is a business outcome; a raised error is a transport/validation outcome.
+  - **Audits failures too** (success, decline, validation failure, availability failure), masked and
+    carrying the transaction and token ids but never card data.
+  - **⚠️ Release-blocked**: whether `token_id` expects `Token#id` or `Token#token` is not yet
+    confirmed against a live environment (`Token#id` is the documented inference). An opt-in UAT
+    spec (`spec/integration/customers_charge_uat_spec.rb`) carries the resolution procedure.
 - **Transactions v2 surface**, implementing feature `003-transactions-v2` on the shared `Resource`
   transport — **additive**, no released method changed. New value-object methods `create_v2`,
   `retrieve`, `update`, `capture` and `cancel` target the documented `/public/v2/transactions` and

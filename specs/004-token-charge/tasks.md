@@ -48,8 +48,8 @@ below may proceed in parallel with this; **nothing in this feature may be releas
 
 **⚠️ CRITICAL**: No user-story work can begin until this phase is complete.
 
-- [ ] T002 Extend `spec/contract/openapi_conformance_spec.rb` to cover `POST /public-customers/charge`, asserting the path/method exist in `reference/Connect-API.json` and the stub URL derives from `client.base_url` (Constitution II/III)
-- [ ] T003 Add a private charge request-body builder to `lib/bml_connect/customers.rb`: it emits exactly `{customerId, transactionId, tokenId}` — no `amount`, no `currency`, no extra keys (FR-002, data-model "What is deliberately absent")
+- [X] T002 Extend `spec/contract/openapi_conformance_spec.rb` to cover `POST /public-customers/charge`, asserting the path/method exist in `reference/Connect-API.json` and the stub URL derives from `client.base_url` (Constitution II/III)
+- [X] T003 Add a private charge request-body builder to `lib/bml_connect/customers.rb`: it emits exactly `{customerId, transactionId, tokenId}` — no `amount`, no `currency`, no extra keys (FR-002, data-model "What is deliberately absent")
 
 **Checkpoint**: the endpoint is conformance-covered and the body builder exists.
 
@@ -67,14 +67,14 @@ is returned with a resolved `state` and no payment URL is needed.
 
 ### Tests for User Story 1 (write FIRST; ensure they FAIL before implementing) ⚠️
 
-- [ ] T004 [P] [US1] Write `spec/unit/customers_charge_spec.rb` (failing): each of `customer_id`, `transaction_id`, `token_id` missing or blank is rejected locally **with no remote call** naming the field; `actor` PAN screening; the request body has exactly three keys; the `200` response maps to `BMLConnect::Models::TransactionRecord`; `state` is passed through verbatim (FR-002, FR-006, FR-008, SC-001)
-- [ ] T005 [P] [US1] Write `spec/contract/customers_charge_remote_spec.rb` (failing): `POST #{client.base_url}public-customers/charge`, raw `Authorization` header — **no `Bearer`, no `X-App-Id`**; body is exactly `{customerId, transactionId, tokenId}`; error mapping per the shared `001` table (FR-001, FR-009)
-- [ ] T006 [P] [US1] Write `spec/unit/customers_charge_no_retry_spec.rb` (failing): simulate a timeout and assert **exactly one** HTTP attempt; repeat for a `500` and a connection reset (FR-004, SC-004)
+- [X] T004 [P] [US1] Write `spec/unit/customers_charge_spec.rb` (failing): each of `customer_id`, `transaction_id`, `token_id` missing or blank is rejected locally **with no remote call** naming the field; `actor` PAN screening; the request body has exactly three keys; the `200` response maps to `BMLConnect::Models::TransactionRecord`; `state` is passed through verbatim (FR-002, FR-006, FR-008, SC-001)
+- [X] T005 [P] [US1] Write `spec/contract/customers_charge_remote_spec.rb` (failing): `POST #{client.base_url}public-customers/charge`, raw `Authorization` header — **no `Bearer`, no `X-App-Id`**; body is exactly `{customerId, transactionId, tokenId}`; error mapping per the shared `001` table (FR-001, FR-009)
+- [X] T006 [P] [US1] Write `spec/unit/customers_charge_no_retry_spec.rb` (failing): simulate a timeout and assert **exactly one** HTTP attempt; repeat for a `500` and a connection reset (FR-004, SC-004)
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Implement `Customers#charge(customer_id:, transaction_id:, token_id:, actor: nil)` in `lib/bml_connect/customers.rb`, posting the T003 body to `"#{PATH}/charge"` with `retries: false` so the shared retry policy is bypassed, and returning a `TransactionRecord` (FR-001–FR-006)
-- [ ] T008 [P] [US1] Write `spec/integration/customers_charge_uat_spec.rb` (opt-in, gated on `BML_CUSTOMER_ID` + `BML_TOKEN_ID`): charge a genuinely stored card against a freshly created transaction and assert a resolved `state` (SC-003)
+- [X] T007 [US1] Implement `Customers#charge(customer_id:, transaction_id:, token_id:, actor: nil)` in `lib/bml_connect/customers.rb`, posting the T003 body to `"#{PATH}/charge"` with `retries: false` so the shared retry policy is bypassed, and returning a `TransactionRecord` (FR-001–FR-006)
+- [X] T008 [P] [US1] Write `spec/integration/customers_charge_uat_spec.rb` (opt-in, gated on `BML_CUSTOMER_ID` + `BML_TOKEN_ID`): charge a genuinely stored card against a freshly created transaction and assert a resolved `state` (SC-003)
 
 **Checkpoint**: a stored card can be charged end-to-end (MVP).
 
@@ -91,13 +91,13 @@ transport failure (a raised availability error), and always has the id needed to
 
 ### Tests for User Story 2 (write FIRST; ensure they FAIL before implementing) ⚠️
 
-- [ ] T009 [P] [US2] Write `spec/unit/customers_charge_outcomes_spec.rb` (failing): a `200` with a failed `state` **returns** a `TransactionRecord`; a 4xx/5xx **raises**; the library never converts one into the other (FR-007, SC-005)
-- [ ] T010 [P] [US2] Add a failing example asserting `AvailabilityError` raised by `charge` **names the `transaction_id`** in its message (FR-005)
-- [ ] T011 [P] [US2] Write `spec/unit/customers_charge_audit_spec.rb` (failing): an audit record is emitted for **every** outcome — success, decline, validation failure, availability failure — carries `transaction_id` + `token_id`, contains no card data, and is emitted **before** any error is re-raised (FR-010, FR-011, SC-002, SC-006)
+- [X] T009 [P] [US2] Write `spec/unit/customers_charge_outcomes_spec.rb` (failing): a `200` with a failed `state` **returns** a `TransactionRecord`; a 4xx/5xx **raises**; the library never converts one into the other (FR-007, SC-005)
+- [X] T010 [P] [US2] Add a failing example asserting `AvailabilityError` raised by `charge` **names the `transaction_id`** in its message (FR-005)
+- [X] T011 [P] [US2] Write `spec/unit/customers_charge_audit_spec.rb` (failing): an audit record is emitted for **every** outcome — success, decline, validation failure, availability failure — carries `transaction_id` + `token_id`, contains no card data, and is emitted **before** any error is re-raised (FR-010, FR-011, SC-002, SC-006)
 
 ### Implementation for User Story 2
 
-- [ ] T012 [US2] Implement the outcome taxonomy and failure auditing in `Customers#charge` (`lib/bml_connect/customers.rb`): map returns vs raises per data-model, and add a charge-specific audit call that passes the real `outcome` — the existing `Customers#audit` helper hardcodes `outcome: :success`, so it must not be reused unchanged (FR-007, FR-010, FR-011)
+- [X] T012 [US2] Implement the outcome taxonomy and failure auditing in `Customers#charge` (`lib/bml_connect/customers.rb`): map returns vs raises per data-model, and add a charge-specific audit call that passes the real `outcome` — the existing `Customers#audit` helper hardcodes `outcome: :success`, so it must not be reused unchanged (FR-007, FR-010, FR-011)
 - [ ] T013 [US2] Resolve `[UNVERIFIED]` #2 against UAT — whether a decline arrives as `200`-with-failed-state or a non-2xx status — and update the decline/outage table in `specs/004-token-charge/contracts/bml-remote.md`
 
 **Checkpoint**: US1 and US2 both work independently; declines and outages are distinguishable and audited.
@@ -112,7 +112,7 @@ failure. Observe on UAT and record loudly; do not assume.
 - [ ] T014 [US1] Resolve `[UNVERIFIED]` #3: charge the same transaction twice on UAT — does BML reject it or double-charge? If it double-charges, add a prominent warning to `specs/004-token-charge/contracts/library-api.md` and the gem `README.md`
 - [ ] T015 [US1] Resolve `[UNVERIFIED]` #4: charge a **deleted** token — it MUST be rejected with a distinguishable error; record the observed error in `specs/004-token-charge/contracts/bml-remote.md`
 - [ ] T016 [US1] Resolve `[UNVERIFIED]` #5: charge a token with a **mismatched** `customerId` — it MUST be rejected; if it succeeds, stop and report to BML (tokens would be chargeable across customers)
-- [ ] T017 [US1] Add `spec/unit/customers_charge_surface_spec.rb` asserting no charge-related method accepts an `amount` keyword and that `BMLConnect::Customers.public_instance_methods(false)` is exactly `%i[archive charge create list retrieve update]` — proving `charge` was added and no combined create-and-charge method exists (FR-003, SC-007)
+- [X] T017 [US1] Add `spec/unit/customers_charge_surface_spec.rb` asserting no charge-related method accepts an `amount` keyword and that `BMLConnect::Customers.public_instance_methods(false)` is exactly `%i[archive charge create list retrieve update]` — proving `charge` was added and no combined create-and-charge method exists (FR-003, SC-007)
 
 **Checkpoint**: both release gates (T001 + T014–T016) are observed, not assumed.
 
@@ -121,10 +121,10 @@ failure. Observe on UAT and record loudly; do not assume.
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [ ] T018 Close the verification table in `specs/004-token-charge/contracts/bml-remote.md`; all five `[UNVERIFIED]` items resolved or explicitly re-scoped
-- [ ] T019 [P] Update the gem `README.md` with the full four-step flow, stating plainly that charging is two calls and that the amount lives on the transaction (FR-003)
-- [ ] T020 [P] Add a `CHANGELOG.md` entry under `[Unreleased]` for `Customers#charge`
-- [ ] T021 [P] Run `bundle exec rubocop` and clear any new offenses in `lib/bml_connect/customers.rb` and the new specs
-- [ ] T022 Verify no code path can retry a charge: `grep` for the retry helper in `lib/bml_connect/customers.rb` and confirm the T006 assertions hold (FR-004, SC-004)
+- [X] T019 [P] Update the gem `README.md` with the full four-step flow, stating plainly that charging is two calls and that the amount lives on the transaction (FR-003)
+- [X] T020 [P] Add a `CHANGELOG.md` entry under `[Unreleased]` for `Customers#charge`
+- [X] T021 [P] Run `bundle exec rubocop` and clear any new offenses in `lib/bml_connect/customers.rb` and the new specs
+- [X] T022 Verify no code path can retry a charge: `grep` for the retry helper in `lib/bml_connect/customers.rb` and confirm the T006 assertions hold (FR-004, SC-004)
 
 ---
 
