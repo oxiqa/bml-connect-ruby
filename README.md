@@ -58,8 +58,14 @@ end
 client = BMLConnect::Client.new
 ```
 ### API Operations
-To create a new transaction
+
+> **Deprecation.** `transactions.create` posts to the legacy, undocumented-but-live
+> `POST /public/transactions` (signed). It still works and its return type is unchanged, but it is
+> **deprecated** in favour of `create_v2`, which targets BML's documented
+> `POST /public/v2/transactions`. The first call in a process logs a one-time deprecation warning.
+
 ```ruby
+# DEPRECATED v1 create — still works, returns a Faraday::Response
 resp = client.transactions.create({
   amount: 10000,
   currency: 'MVR',
@@ -67,16 +73,56 @@ resp = client.transactions.create({
   localId: 'local-1',
   customerReference: 'INV-0001'
 })
+resp = client.transactions.get(id)          # => Faraday::Response
+resp = client.transactions.list({ page: 2 }) # => Faraday::Response
 ```
-To fetch a specified transaction
+
+The v1 responses are [`Faraday::Response`](https://github.com/lostisland/faraday/blob/main/lib/faraday/response.rb) objects, `json`-encoded with symbolized names.
+
+#### v2 surface (value objects)
+
+The v2 methods target the documented endpoints, return whitelisted `TransactionRecord` value
+objects, and **raise** on failure. `amount` MUST be a **positive Integer in minor units**
+(`10_000` = MVR 100.00); a Float or String is rejected locally, never coerced.
+
 ```ruby
-resp = client.transactions.get(id)
+txn = client.transactions.create_v2(
+  amount:      10_000,          # required — positive Integer, minor units
+  currency:    "MVR",           # required
+  redirectUrl: "https://merchant.example.mv/return",
+  localId:     "INV-0001",
+  customerId:  "cus_123"        # variant 3 (or supply an inline `customer:` — variant 4)
+)
+txn.id
+txn.state                       # passed through verbatim (e.g. "CONFIRMED")
+txn.payment_url                 # hosted page to send the cardholder to (never logged/audited)
+
+client.transactions.retrieve("txn_…")                       # => TransactionRecord (`get` still returns raw)
+client.transactions.update("txn_…", customerReference: "…") # partial merge: customerReference/localData/pnr
+client.transactions.capture("txn_…", amount: 10_000)        # amount obeys the same rule as create
+client.transactions.cancel("txn_…")
 ```
-To transaction list
+
+Store a card while taking payment by adding `tokenizationDetails`; the token appears under the
+customer (via `client.tokens.list`) only **after** the cardholder completes the payment:
+
 ```ruby
-resp = client.transactions.list({ page: 2 })
+client.transactions.create_v2(
+  amount: 10_000, currency: "MVR", customerId: "cus_123",
+  redirectUrl: "https://merchant.example.mv/return",
+  tokenizationDetails: {
+    tokenize:           true,
+    paymentType:        "RECURRING",   # or "UNSCHEDULED"
+    recurringFrequency: "MONTHLY",     # required when RECURRING
+    expiryDate:         "2027-01-01"   # required when RECURRING; yyyy-mm-dd, future
+  }
+)
 ```
-API responses are instances of [`Faraday::Response`](https://github.com/lostisland/faraday/blob/main/lib/faraday/response.rb) class, `json` encoded with symbolized names. 
+
+Create and capture are **never auto-retried** (no documented idempotency key); retrieve, list,
+update and cancel retry with backoff. Which v2 response field carries the hosted payment URL is
+still being verified against UAT — until then, `payment_url` raises `UnverifiedFieldError` rather
+than returning `nil`, so `create_v2` should not be adopted in production yet.
 
 ### Customers
 

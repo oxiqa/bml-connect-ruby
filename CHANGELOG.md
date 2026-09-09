@@ -1,6 +1,32 @@
 ## [Unreleased]
 
 ### Added
+- **Transactions v2 surface**, implementing feature `003-transactions-v2` on the shared `Resource`
+  transport — **additive**, no released method changed. New value-object methods `create_v2`,
+  `retrieve`, `update`, `capture` and `cancel` target the documented `/public/v2/transactions` and
+  `/public/transactions/{id}` endpoints, return whitelisted `BMLConnect::Models::TransactionRecord`
+  objects, and raise the shared typed error hierarchy. Highlights:
+  - `create_v2` supports variant 3 (existing `customerId`) and variant 4 (inline `customer`);
+    variants 1/2 (shop orders) and 5 (foreign exchange) are rejected locally by name.
+  - `tokenizationDetails` (`BMLConnect::Models::TokenizationDetails`) instructs BML to store a card;
+    `tokenize`/`paymentType` are required, and `recurringFrequency`/future `expiryDate` are required
+    when `paymentType` is `RECURRING` — all validated before any remote call.
+  - `amount` (on both `create_v2` and `capture`) must be a **positive Integer in minor units**; a
+    Float, String, zero, or negative is rejected by name and never coerced.
+  - **No auto-retry on create or capture** (no documented idempotency key); a timeout raises
+    `AvailabilityError` after exactly one attempt. Retrieve/list/update/cancel retry with backoff.
+  - `create_v2`/`update`/`capture`/`cancel` emit masked audit records; the hosted payment URL is
+    treated as a completion secret — omitted from `#to_h`/`#inspect` and never logged or audited.
+    `TransactionRecord#payment_url` raises `UnverifiedFieldError` (new) rather than returning `nil`
+    when no URL field is present, pending UAT confirmation of which v2 field carries it.
+  - `state` is passed through verbatim (never normalized); v2 requests send **no** `signature`
+    until UAT settles whether v2 accepts one.
+- **Deprecated** the legacy v1 `transactions.create` (undocumented-but-live `POST
+  /public/transactions`). It still works unchanged and returns a `Faraday::Response`, but now logs a
+  single, once-per-process deprecation warning pointing at `create_v2`.
+- Fixed a latent Ruby 2.7 bug in `BMLConnect::Models::Transaction`: a missing-fields `create`
+  raised `NoMethodError` (`Set#join`, Ruby 3.0+) instead of the intended `ArgumentError` on the 2.7
+  runtime `msgowl/website` uses. Bug fix only — makes the code do what its own test already asserts.
 - **Stored card tokens resource** (`client.tokens`), implementing feature `002-stored-card-tokens`
   against BML's `/public-customers/{customerId}/tokens` contract: `list`, `retrieve`, and `delete`
   (soft delete, `204`). Read-and-delete **only** — BML publishes no token-creation endpoint, so the
@@ -53,11 +79,15 @@
   backward-compatibility statement.
 
 ### Notes
-- Feature `001-customers-endpoints` is now **implemented**; `002`–`004` remain specified, not
-  implemented. `BMLConnect::Client` gains a memoized `#customers` plus `#logger`/`#timeout`/
-  `#max_retries`/`#retry_backoff` accessors with safe defaults; every existing method —
-  `BMLConnect::Transactions` included — keeps its 0.2.0 behavior and signature. The change is
-  purely additive.
+- Features `001-customers-endpoints`, `002-stored-card-tokens` and `003-transactions-v2` are now
+  **implemented**; `004-token-charge` remains specified, not implemented. `BMLConnect::Client`
+  gains memoized `#customers`/`#tokens` plus `#logger`/`#timeout`/`#max_retries`/`#retry_backoff`
+  accessors with safe defaults. Feature `003` is additive to the released transactions surface:
+  `create`, `get` and `list` keep their 0.2.0 behavior, signature, and `Faraday::Response` return
+  type; the v2 value-object methods sit alongside them.
+- Feature `003` is **not production-ready** until UAT confirms which v2 response field carries the
+  hosted payment URL (`create_v2` may be called but its `payment_url` will raise until then), and
+  until the `msgowl/website` suite is verified to pass unchanged against this gem (release gate).
 - `specs/004-token-charge` is **release-blocked**: it is unconfirmed whether BML's `tokenId`
   field expects a token's `id` or its `token` value. Charging the wrong identifier is a
   money-movement defect.
