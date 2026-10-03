@@ -1,6 +1,54 @@
 ## [Unreleased]
 
 ### Added
+- **Transaction-status webhook handling** (`client.webhooks.handle`), implementing feature
+  `005-webhook-handler`. Accepts a raw inbound notification — body, headers, and optionally a
+  caller-presented shared secret — and returns a `BMLConnect::Models::StatusChangeResult`. The
+  published contract documents the callback **nowhere** (no payload schema, no event list, no
+  signature or authentication), so the entire inbound surface is `[UNVERIFIED]` and the design is
+  built to need almost nothing from it. Highlights:
+  - **Verify-by-fetch, with no opt-out.** The payload is an untrusted hint that something changed;
+    the reported status always comes from a fresh `GET /public/transactions/{id}`. A forged "payment
+    confirmed" can at worst cost one wasted retrieve. No flag, option, or mode skips the retrieve —
+    test-enforced against the public surface, not merely defaulted.
+  - **No web-framework dependency and no new gem dependency at all.** Parsing uses stdlib `json` and
+    `uri`; the constant-time secret comparison uses stdlib `digest`. The library owns no route and
+    never writes a response.
+  - **At most two retrieves per notification, neither auto-retried.** The verify, plus at most one
+    delayed re-check when the payload's claimed status disagrees with the authoritative one
+    (default delay 3s, `0` disables it — the delay is spent inside the caller's request).
+  - **Advisory HTTP status on every result and error** (`advisory_http_status`), distinguishing
+    permanent outcomes from transient ones so a host application knows when redelivery helps.
+    `404` is never advised, even for a missing transaction: it reads as "no such endpoint" and risks
+    the hook being disabled.
+  - **Optional shared secret that gates spend, not trust.** When configured, a delivery presenting
+    no value or a wrong one is rejected with **zero** retrieves; a match never causes the payload to
+    be believed. The caller extracts the value (BML controls the callback's headers, so in practice
+    it rides in the registered URL) — the library never infers a location.
+  - **No raw payload on the result.** Payload-derived data is limited to a masked `claimed_status`
+    and a `disagreed?` flag; the raw body reaches the masked audit record only.
+  - **Audits every outcome, including rejections** — a refused delivery is the signature of a forgery
+    attempt, and an operator needs to see it.
+  - **No state enumeration, no deduplication, no body-size limit** — the published contract defines
+    no states, the gem owns no datastore, and it does not own the socket.
+  - **⚠️ Release-blocked**: which inbound field carries the transaction identifier has not been
+    observed against UAT (`transactionId`, `transaction_id`, `id` are inferences). A wrong guess
+    fails loudly rather than reporting a false status, and `extract_id:` overrides the list outright.
+    See `specs/005-webhook-handler/contracts/bml-remote.md` for the observation procedure.
+- `BMLConnect::WebhookRejectedError` — raised when an inbound notification fails the optional
+  shared-secret check. A distinct class so a security rejection stays observably separate from a
+  malformed body.
+
+### Changed
+- `BMLConnect::Error` now carries an `advisory_http_status` accessor (nil unless set by the webhook
+  path). No existing error class or raise site changed behavior.
+- `Transactions#retrieve` accepts an optional `retries:` keyword (default `true`, preserving released
+  behavior). The webhook handler passes `false`: the two-retrieve cap counts HTTP calls, so with
+  retry left on, one notification arriving while BML was flaky could have made six requests.
+- BML's own error text is now masked before it becomes an exception message, so a card-like value in
+  an upstream error body cannot reach a log or an error message. Applies to every resource.
+
+### Added (earlier, unreleased)
 - **Stored-card charge** (`client.customers.charge`), implementing feature `004-token-charge` on
   the documented `POST /public-customers/charge` endpoint. Takes `customer_id:`, `transaction_id:`
   and `token_id:` (all required, validated locally by name before any remote call) plus an optional

@@ -15,3 +15,10 @@
 .env
 .env.*
 !.env.example
+
+# macOS / editor noise
+.DS_Store
+
+# Built gem artifacts
+*.gem
+/vendor/bundle/

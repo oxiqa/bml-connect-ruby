@@ -116,7 +116,10 @@ module BMLConnect
     def map_error(response)
       status = response.status
       body = response.body
-      message = extract_message(body) || "BML request failed with status #{status}"
+      # Masked at the source: BML's own error text is data we did not author, and
+      # a card-like value in it must never reach an error message, a log, or an
+      # audit record (Constitution I; feature 005 FR-011).
+      message = Masking.scrub(extract_message(body) || "BML request failed with status #{status}")
 
       case status
       when 400, 422 then ValidationError.new(message)

@@ -243,6 +243,153 @@ Notes:
   expects `Token#id` or `Token#token`. `Token#id` is the current inference; do not rely on this in
   production until it is verified (see `specs/004-token-charge/`).
 
+### Receiving transaction-status webhooks
+
+BML can notify your application when a transaction's status changes. The published contract
+documents how to *register* a hook URL and **nothing at all** about the notification it sends — no
+payload schema, no event list, and no signature, secret, or authentication. So this handler never
+trusts the delivery: it reads one field (which transaction) and takes every consequential fact from a
+fresh retrieve.
+
+Framework-agnostic by design — the gem is handed a body and returns a value object. It adds **no web
+framework dependency**, owns no route, and never writes a response.
+
+```ruby
+# config/routes.rb → post "/bml/notify" => "bml#notify"
+
+def notify
+  result = BML.client.webhooks.handle(
+    body:    request.body.read,
+    headers: request.env                    # Rails request.headers works too
+  )
+
+  Order.find_by!(transaction_id: result.transaction_id)
+       .apply_bml_status(result.status)     # ← authoritative, from BML
+
+  head result.advisory_http_status          # 200
+rescue BMLConnect::Error => e
+  head e.advisory_http_status || 500        # 4xx = stop; 503 = please redeliver
+end
+```
+
+**The status never comes from the payload.** A forged "payment confirmed" posted to your public
+endpoint cannot ship goods: the library retrieves the transaction and reports what BML says. There is
+no flag that turns this off — `handle(verify: false)` raises `ArgumentError`, because the option does
+not exist.
+
+```ruby
+result.status          # authoritative, retrieved fresh from BML — verbatim, never coerced
+result.claimed_status  # what the delivery claimed. Diagnostic only. Never act on it.
+result.disagreed?      # they differed → a replay, a read-path lag, or a forgery
+result.transaction     # BMLConnect::Models::TransactionRecord
+```
+
+Expect states this gem has never heard of: the published contract enumerates none, so nothing is
+coerced or rejected. Treat `result.status` as **current-as-of-retrieve**, not final.
+
+#### What to return to BML
+
+Every result and error carries `advisory_http_status`. It is advice — the library never writes a
+response and does not require you to honor it.
+
+| Outcome | Advisory | Meaning to the sender |
+|---|---|---|
+| Accepted | `200` | done |
+| Malformed / empty / unparseable body | `400` | permanent — do not redeliver |
+| Secret absent or wrong | `401` | permanent |
+| No identifier extractable | `422` | permanent |
+| Transaction does not exist | `422` | permanent |
+| BML unreachable, timeout, 5xx, rate limited | `503` | **transient — please redeliver** |
+| Our API key rejected | `503` | transient |
+
+`404` is never advised. A missing transaction gets `422` instead: `404` from an HTTP endpoint reads as
+"no such endpoint", and a sender that decides your hook URL is gone may stop delivering — turning one
+forged identifier into an outage for every genuine notification after it.
+
+#### Configuration
+
+```ruby
+BMLConnect::Client.new(
+  api_key: ENV.fetch("BML_API_KEY"),
+  options: {
+    webhook_secret:        ENV["BML_WEBHOOK_SECRET"],  # optional
+    webhook_recheck_delay: 3                           # seconds; 0 disables the re-check
+  }
+)
+```
+
+**`webhook_secret` gates spend, not trust.** With one configured, a delivery whose presented value is
+absent or wrong is rejected before any retrieve is spent. A match never causes the payload to be
+believed and never skips the retrieve — the same notification reports an identical status either way.
+
+You extract the value; the library only compares it (in constant time). It never guesses where the
+secret travels and never asks for the request URL. BML controls the callback's headers, so in practice
+a secret can only ride in the URL you registered:
+
+```ruby
+# registered hook URL: https://you.example/bml/notify?t=SECRET
+BML.client.webhooks.handle(body: body, headers: headers, presented_secret: params[:t])
+```
+
+> Enabling a secret on an existing hook? Re-register or update the URL **first**. Deliveries with
+> nothing to present are rejected, and legitimate notifications drop silently until you do.
+
+**`webhook_recheck_delay` is spent inside your request.** When the payload's claimed status disagrees
+with the first retrieve, the library waits (default **3 seconds**) and retrieves once more — BML's read
+path may lag the event that fired the callback. **If your endpoint's response deadline is at or below
+3 seconds, set this to `0`**; a sender that times out will redeliver, turning a latency problem into a
+replay problem. The cost lands on every disagreeing delivery, including every replay.
+
+At most **two** retrieves per notification, neither auto-retried. Nothing a payload claims produces a
+third.
+
+#### Limits you own, not the gem
+
+- **Request size.** The library enforces **no** body size or nesting limit and parses whatever you
+  hand it — it does not own the socket, so a limit it invented would be the wrong one. Bound it at
+  your web server (`client_max_body_size`, a Rack middleware).
+- **Every request costs a retrieve** when no secret is configured. Your endpoint is public;
+  protecting it is yours.
+- **Deduplication and ordering.** The gem owns no datastore and deduplicates nothing. Deliveries are
+  at-least-once and possibly out of order; `result.transaction_id` is surfaced so you can key on it.
+  Handling the same delivery twice produces equal results against an unchanged record, with no side
+  effect beyond the retrieve.
+- **Registration.** `POST/DELETE /public/webhooks` are not implemented. Register through the merchant
+  portal, or per-transaction via `webhook:` on `create_v2`.
+
+If a notification never arrives, reconcile directly — no webhook needed:
+
+```ruby
+BML.client.transactions.retrieve(transaction_id).state
+```
+
+#### When the built-in field names are wrong
+
+The identifier is looked for under `transactionId`, `transaction_id`, then `id` (top-level keys only).
+All three are **inferences** from the published document, not observed facts. If you have seen your
+own deliveries and know the real field, say so and the library will not second-guess you:
+
+```ruby
+BML.client.webhooks.handle(
+  body: body, headers: headers,
+  extract_id: ->(payload, headers) { payload.dig(:transaction, :id) }
+)
+```
+
+The callable receives the parsed payload and the normalized headers — headers included so an
+identifier arriving outside the body does not block you. Return `nil` for "not found" and you get the
+same loud `ValidationError` as an exhausted list, with no remote call.
+
+Bodies are accepted as JSON or form-encoded, selected by `Content-Type` (with a documented fallback
+when it is absent). Header names are normalized for you, so `request.env`, `request.headers`, and a
+plain hash all work.
+
+> **⚠️ Not release-verified.** Which inbound field carries the transaction identifier has not been
+> observed against UAT, so every built-in candidate is `[UNVERIFIED]`. A wrong guess fails loudly
+> rather than reporting a false status, and `extract_id:` bypasses the list — but confirm it against a
+> real delivery before relying on the defaults. See
+> [`specs/005-webhook-handler/`](specs/005-webhook-handler/).
+
 ## Roadmap
 
 Tokenization support is moving into this gem. It was previously being built as a separate
@@ -259,6 +406,7 @@ disagree, the document wins.
 | [`002-stored-card-tokens`](specs/002-stored-card-tokens/) | `/public-customers/{id}/tokens` | Implemented (pending live UAT verification) |
 | [`003-transactions-v2`](specs/003-transactions-v2/) | `/public/v2/transactions` | Specified |
 | [`004-token-charge`](specs/004-token-charge/) | `/public-customers/charge` | Implemented, release-blocked (pending live UAT: `tokenId` identity) |
+| [`005-webhook-handler`](specs/005-webhook-handler/) | inbound callback + `/public/transactions/{id}` | Implemented, release-blocked (pending live UAT: which field carries the transaction id) |
 
 Each feature directory carries a `spec.md`, `plan.md`, `research.md`, `data-model.md`, `tasks.md`
 and two contracts — one for the BML HTTP surface, one for the Ruby surface this gem exposes.

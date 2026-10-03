@@ -7,6 +7,7 @@ require 'bml_connect/models/customer'
 require 'bml_connect/models/customer_list'
 require 'bml_connect/models/token'
 require 'bml_connect/models/token_list'
+require "bml_connect/models/status_change_result"
 
 module BMLConnect
   module Models

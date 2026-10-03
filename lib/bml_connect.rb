@@ -11,6 +11,7 @@ require "bml_connect/models"
 require "bml_connect/transactions"
 require "bml_connect/customers"
 require "bml_connect/tokens"
+require "bml_connect/webhooks"
 
 module BMLConnect
   # Base error is defined in bml_connect/errors.rb (required above).

@@ -17,7 +17,15 @@ module BMLConnect
     DEFAULT_MAX_RETRIES = 2
     DEFAULT_RETRY_BACKOFF = 0.5
 
-    attr_reader(:api_key, :app_id, :mode, :http_client, :transactions, :logger)
+    # Seconds to wait before the webhook handler's single re-check (feature 005,
+    # FR-010b). Spent INSIDE the caller's request, so an endpoint whose own
+    # response deadline is at or below this MUST set it to 0, which disables the
+    # re-check entirely. A judgment, not an observed figure: see
+    # specs/005-webhook-handler/contracts/bml-remote.md [UNVERIFIED] #4.
+    DEFAULT_WEBHOOK_RECHECK_DELAY = 3
+
+    attr_reader(:api_key, :app_id, :mode, :http_client, :transactions, :logger,
+                :webhook_secret, :webhook_recheck_delay)
     attr_accessor(:timeout, :max_retries, :retry_backoff)
 
     def initialize(api_key: nil, app_id: nil, mode: nil, options: {})
@@ -28,10 +36,17 @@ module BMLConnect
       # Pull the customers-resource knobs out of options before the rest is
       # handed to Faraday, which would reject unknown keys.
       opts = options.dup
-      @logger = opts.key?(:logger) ? opts.delete(:logger) : default_logger
-      @timeout = opts.key?(:timeout) ? opts.delete(:timeout) : DEFAULT_TIMEOUT
-      @max_retries = opts.key?(:max_retries) ? opts.delete(:max_retries) : DEFAULT_MAX_RETRIES
-      @retry_backoff = opts.key?(:retry_backoff) ? opts.delete(:retry_backoff) : DEFAULT_RETRY_BACKOFF
+      @logger = pull_option(opts, :logger) { default_logger }
+      @timeout = pull_option(opts, :timeout) { DEFAULT_TIMEOUT }
+      @max_retries = pull_option(opts, :max_retries) { DEFAULT_MAX_RETRIES }
+      @retry_backoff = pull_option(opts, :retry_backoff) { DEFAULT_RETRY_BACKOFF }
+
+      # Webhook-handler knobs (feature 005). Pulled out for the same reason as the
+      # four above: Faraday rejects keys it does not know. webhook_secret is
+      # configuration supplied by the integrator (typically from the environment)
+      # and MUST NEVER be hardcoded (FR-012).
+      @webhook_secret = pull_option(opts, :webhook_secret) { nil }
+      @webhook_recheck_delay = pull_option(opts, :webhook_recheck_delay) { DEFAULT_WEBHOOK_RECHECK_DELAY }
 
       @http_client = initialize_http_client(opts)
       @transactions = Transactions.new(self)
@@ -46,6 +61,12 @@ module BMLConnect
     # credentials. Read-and-delete only — see BMLConnect::Tokens.
     def tokens
       @tokens ||= Tokens.new(self)
+    end
+
+    # Memoized inbound notification handler, bound to this client's mode,
+    # credentials, secret and re-check delay. See BMLConnect::Webhooks.
+    def webhooks
+      @webhooks ||= Webhooks.new(self)
     end
 
     def base_url
@@ -70,6 +91,12 @@ module BMLConnect
     end
 
     private
+
+    # Take +key+ out of the options hash (so Faraday never sees it) and fall back
+    # to the block when the caller did not supply it. An explicit nil is honored.
+    def pull_option(opts, key)
+      opts.key?(key) ? opts.delete(key) : yield
+    end
 
     # Default audit/diagnostic logger. Emits masked structured lines to stdout;
     # integrators can inject their own via `options: { logger: ... }`.

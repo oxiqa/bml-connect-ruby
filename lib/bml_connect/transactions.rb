@@ -98,12 +98,21 @@ module BMLConnect
 
     # Retrieve a transaction by id. Value-object counterpart to #get, which
     # remains available. `state` is passed through verbatim (research R8). Not
-    # audited (read). MAY retry (FR-016).
-    def retrieve(id, actor: nil)
+    # audited (read). MAY retry (FR-016) — hence `retries: true` by default,
+    # which is feature 003's released behavior, unchanged.
+    #
+    # Pass `retries: false` when the CALLER must bound the number of HTTP calls
+    # rather than the transport. The webhook handler (feature 005) does exactly
+    # that: FR-009 caps a notification at two retrieves counted in HTTP calls, so
+    # with retry left on, one delivery arriving while BML is flaky would make up
+    # to six requests and a forger could use a wobbly BML to triple their
+    # amplification (005 research R3). A transport failure then raises
+    # AvailabilityError after exactly one attempt.
+    def retrieve(id, actor: nil, retries: true)
       require_id!(id)
       screen_actor!(actor)
 
-      response = request(:get, "#{BASE_PATH}/#{id}")
+      response = request(:get, "#{BASE_PATH}/#{id}", retries: retries)
       Models::TransactionRecord.new(response.body)
     end
 
