@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+Carried by version string `0.3.0.pre.1` — a prerelease marker, not a published release. It exists so
+a consumer can tell at a glance that it is not running the published `0.2.0`, and the `.pre` suffix
+records that the release gates below (the `tokenId` identity, the v2 payment-URL field, the webhook
+identifier field, and the absence of any live token/charge observation) are still open. Drop the
+suffix when they close and this is cut for real.
+
 ### Added
 - **Transaction-status webhook handling** (`client.webhooks.handle`), implementing feature
   `005-webhook-handler`. Accepts a raw inbound notification — body, headers, and optionally a
