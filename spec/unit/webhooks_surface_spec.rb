@@ -23,11 +23,14 @@ RSpec.describe BMLConnect::Webhooks, "public surface" do
       end
     end
 
-    it "accepts exactly the five documented keywords and no more" do
+    # `router` chooses where a VERIFIED result goes; it cannot change whether
+    # verification happened. The proof is in webhooks_router_spec.rb, which
+    # asserts the retrieve still occurs when a router is supplied.
+    it "accepts exactly the six documented keywords and no more" do
       keywords = BMLConnect::Webhooks.instance_method(:handle).parameters
                                      .select { |kind, _| %i[key keyreq].include?(kind) }
                                      .map(&:last)
-      expect(keywords).to eq(%i[body headers presented_secret extract_id actor])
+      expect(keywords).to eq(%i[body headers presented_secret extract_id actor router])
     end
 
     it "exposes exactly one public method" do

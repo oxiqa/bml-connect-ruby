@@ -113,7 +113,11 @@ module BMLConnect
     # retrieve FR-009a requires. An unauthenticated sender should not be able to
     # reach the parser at all, since the library enforces no body size limit
     # (FR-003c) and parsing is the only work left that an attacker can provoke.
-    def handle(body:, headers: {}, presented_secret: nil, extract_id: nil, actor: nil)
+    # +router+:: an optional Router. When given, the verified result is passed
+    #            to the handler the router's resolver names, and THAT handler's
+    #            return value is returned instead of the result. Verification is
+    #            unchanged: a router never causes a payload to be believed.
+    def handle(body:, headers: {}, presented_secret: nil, extract_id: nil, actor: nil, router: nil)
       screen_actor!(actor)
       delay = recheck_delay!(actor: actor, raw_body: body)
       normalized = normalize_headers(headers)
@@ -132,9 +136,10 @@ module BMLConnect
         rechecked = true
       end
 
-      build_result(transaction_id, record, claimed, rechecked).tap do |result|
-        audit(:success, actor: actor, raw_body: body, result: result)
-      end
+      result = build_result(transaction_id, record, claimed, rechecked)
+      audit(:success, actor: actor, raw_body: body, result: result)
+
+      router ? router.dispatch(result) : result
     end
 
     private
