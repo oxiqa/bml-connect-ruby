@@ -7,6 +7,15 @@ identifier field, and the absence of any live token/charge observation) are stil
 suffix when they close and this is cut for real.
 
 ### Added
+- **Webhook dispatch** (`BMLConnect::Webhooks::Router`, and a `router:` keyword on
+  `client.webhooks.handle`). A merchant registers one hook in BML's portal, so a single endpoint
+  receives notifications for every transaction the merchant creates. The router sends a **verified**
+  result to the handler the consumer's own resolver names — the gem stays ignorant of what those
+  names mean, because the payload cannot say which of a consumer's flows owns a transaction and
+  only the consumer's records can. Registering two handlers under one name, naming an unregistered
+  handler, or receiving a transaction nothing owns with no fallback all raise rather than passing
+  silently. `router:` chooses where a verified result goes; it cannot affect whether verification
+  happened, which `spec/unit/webhooks_surface_spec.rb` continues to guard.
 - **Transaction-status webhook handling** (`client.webhooks.handle`), implementing feature
   `005-webhook-handler`. Accepts a raw inbound notification — body, headers, and optionally a
   caller-presented shared secret — and returns a `BMLConnect::Models::StatusChangeResult`. The

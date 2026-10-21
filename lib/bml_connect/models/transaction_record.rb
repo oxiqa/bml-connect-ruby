@@ -17,7 +17,7 @@ module BMLConnect
         canRefundIfConfirmed externalImport externalId localId paymentToken
         history appVersion apiVersion redirectUrl costStructure
         providerDisplayName paddedCardNumber customerId
-        customerReference localData pnr
+        customerReference localData pnr tokenizationDetails
       ].freeze
 
       # Fields that may carry the hosted payment link, in resolution order. `url`
@@ -55,10 +55,24 @@ module BMLConnect
         candidate
       end
 
-      # True once BML has stored a card for this transaction. The token itself is
-      # read via the tokens resource (feature 002); this only signals presence.
+      # Whether the gateway kept the card. It echoes `tokenizationDetails` back
+      # with the outcome, which is the only field that says so.
+      #
+      # NOT `paymentToken`: that is the acquirer's authorisation code — the
+      # trailing six digits of `externalId` — and is present on any authorised
+      # payment, tokenized or not (observed in UAT 2026-10-21).
       def tokenized?
-        !blank?(paymentToken)
+        tokenization_detail("tokenize") == true
+      end
+
+      # The token this transaction created, as listed under the customer.
+      # `tokenId` and `tokenObjectId` carry the same value; both are read so a
+      # response that drops one still resolves.
+      def stored_token_id
+        return nil unless tokenized?
+
+        id = tokenization_detail("tokenId")
+        blank?(id) ? presence(tokenization_detail("tokenObjectId")) : id
       end
 
       # Whitelisted view. The hosted payment `url` is never included (FR-015).
@@ -85,6 +99,17 @@ module BMLConnect
       end
 
       private
+
+      def tokenization_detail(key)
+        details = tokenizationDetails
+        return nil unless details.respond_to?(:[])
+
+        details[key].nil? ? details[key.to_sym] : details[key]
+      end
+
+      def presence(value)
+        blank?(value) ? nil : value
+      end
 
       def qr_url
         return nil unless qr.is_a?(Hash)
