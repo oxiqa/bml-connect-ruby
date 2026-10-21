@@ -28,6 +28,22 @@ module BMLConnect
       # reachable only through the explicit #payment_url accessor.
       PAYMENT_URL_KEYS = %i[url redirectUrl].freeze
 
+      # Fields in which BML reports what it DID about tokenization, as opposed
+      # to +tokenizationDetails+, which is the request WE sent and which BML
+      # echoes back — an echo says only that we asked. `tokenize` and
+      # `tokenizationMethod` are the documented Transaction fields; the rest
+      # were observed on live UAT notifications (2026-10-21) and appear in no
+      # published schema.
+      #
+      # Whitelisted separately and reachable only through #tokenization_report:
+      # they exist to be logged while diagnosing a card that was not stored, so
+      # they do not belong in #to_h or #inspect, and keeping them a whitelist
+      # preserves the rule that no unexpected key can reach a log line.
+      TOKENIZATION_FIELDS = %i[
+        tokenize tokenizationMethod tokenisationStatus tokenizationStatus
+        token clientSideTokenId initiator
+      ].freeze
+
       ATTRIBUTES.each { |attribute| attr_reader attribute }
 
       def initialize(data = {})
@@ -75,6 +91,21 @@ module BMLConnect
         blank?(id) ? presence(tokenization_detail("tokenObjectId")) : id
       end
 
+      # What the gateway said about tokenization, for a log line. Present keys
+      # only: an empty hash means BML reported nothing at all about the card,
+      # which is itself the answer when a tokenizing transaction stored none.
+      #
+      # Every string is scrubbed, because these fields are undocumented and a
+      # diagnostic must not be the one place a card number reaches a log.
+      def tokenization_report
+        report = TOKENIZATION_FIELDS.each_with_object({}) do |key, hash|
+          value = @source[key]
+          hash[key] = value.is_a?(String) ? Masking.scrub(value) : value unless blank?(value)
+        end
+        report[:tokenizationDetails] = scrub_details if tokenizationDetails.respond_to?(:each_pair)
+        report
+      end
+
       # Whitelisted view. The hosted payment `url` is never included (FR-015).
       def to_h
         ATTRIBUTES.each_with_object({}) do |attribute, hash|
@@ -107,6 +138,12 @@ module BMLConnect
         details[key].nil? ? details[key.to_sym] : details[key]
       end
 
+      def scrub_details
+        tokenizationDetails.each_with_object({}) do |(key, value), hash|
+          hash[key.to_sym] = value.is_a?(String) ? Masking.scrub(value) : value
+        end
+      end
+
       def presence(value)
         blank?(value) ? nil : value
       end
@@ -118,9 +155,10 @@ module BMLConnect
       end
 
       # Symbol-first access with a string fallback, over every key we might read
-      # (whitelist plus the payment-URL candidates).
+      # (whitelist, plus the payment-URL candidates and the tokenization
+      # diagnostics).
       def normalize(source)
-        (ATTRIBUTES + PAYMENT_URL_KEYS).each_with_object({}) do |key, hash|
+        (ATTRIBUTES + PAYMENT_URL_KEYS + TOKENIZATION_FIELDS).each_with_object({}) do |key, hash|
           hash[key] = source.key?(key) ? source[key] : source[key.to_s]
         end
       end

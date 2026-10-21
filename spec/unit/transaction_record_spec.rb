@@ -113,4 +113,62 @@ RSpec.describe BMLConnect::Models::TransactionRecord do
       expect(record.stored_token_id).to eq("tok_abc")
     end
   end
+
+  # Diagnostic surface. It exists because a card the gateway never kept and a
+  # tokenization this library never asked for look identical once the
+  # transaction is confirmed, and #tokenized? cannot tell them apart: it reads
+  # the request we sent, which BML echoes back either way.
+  describe "#tokenization_report" do
+    it "is empty when BML said nothing at all about the card" do
+      expect(described_class.new(id: "txn_1").tokenization_report).to eq({})
+    end
+
+    it "reports the echoed request, so an echo with no token id is visible" do
+      record = described_class.new(
+        id: "txn_1",
+        tokenizationDetails: { "tokenize" => true, "paymentType" => "UNSCHEDULED" }
+      )
+
+      expect(record.tokenization_report).to eq(
+        tokenizationDetails: { tokenize: true, paymentType: "UNSCHEDULED" }
+      )
+      expect(record.tokenized?).to be(true)
+      expect(record.stored_token_id).to be_nil
+    end
+
+    it "reports the outcome fields BML actually fills when it keeps a card" do
+      record = described_class.new(
+        "tokenize" => true, "tokenizationMethod" => "MPGS",
+        "tokenisationStatus" => "TOKENISED", "token" => "tok_abc",
+        "tokenizationDetails" => { "tokenize" => true, "tokenId" => "tok_abc" }
+      )
+
+      expect(record.tokenization_report).to include(
+        tokenize: true, tokenizationMethod: "MPGS",
+        tokenisationStatus: "TOKENISED", token: "tok_abc"
+      )
+    end
+
+    it "distinguishes a refusal from silence" do
+      expect(described_class.new("tokenize" => false).tokenization_report).to eq(tokenize: false)
+    end
+
+    # These fields are undocumented, so a diagnostic must not become the one
+    # place a card number reaches a log.
+    it "scrubs a card number out of an undocumented field" do
+      record = described_class.new("token" => "4111111111111111",
+                                   "tokenizationDetails" => { "pan" => "4111111111111111" })
+
+      expect(record.tokenization_report[:token]).to eq(BMLConnect::Masking::REDACTION)
+      expect(record.tokenization_report[:tokenizationDetails][:pan])
+        .to eq(BMLConnect::Masking::REDACTION)
+    end
+
+    it "keeps the diagnostics out of the record's own whitelisted views" do
+      record = described_class.new(id: "txn_1", "tokenisationStatus" => "TOKENISED")
+
+      expect(record.to_h.keys).to eq(described_class::ATTRIBUTES)
+      expect(record.inspect).not_to include("tokenisationStatus")
+    end
+  end
 end

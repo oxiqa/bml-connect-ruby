@@ -77,15 +77,46 @@ RSpec.describe BMLConnect::Models::StatusChangeResult do
       end
     end
 
+    # event_type belongs here for the same reason claimed_status does: it is
+    # ONE named payload-derived field, not a door onto the payload. Adding it
+    # is a deliberate widening; adding a `payload` entry would not be.
     it "keeps to_h to the whitelist, with no payload-shaped entry" do
       expect(result.to_h.keys).to eq(
-        %i[transaction_id status changed_at claimed_status disagreed rechecked advisory_http_status transaction]
+        %i[transaction_id status changed_at claimed_status event_type
+           disagreed rechecked advisory_http_status transaction]
       )
     end
 
     it "keeps inspect free of anything payload-shaped" do
       expect(result.inspect).to include("txn_1")
       expect(result.inspect).not_to match(/payload|raw/i)
+    end
+  end
+
+  # BML's portal registers a hook per event category, so which category a
+  # delivery claims to be decides which handler runs. It never decides what
+  # that handler believes.
+  describe "#event_type" do
+    it "carries the category the payload named" do
+      categorised = described_class.new(
+        transaction_id: "txn_1", transaction: record, event_type: "NOTIFY_TOKENISATION_STATUS"
+      )
+
+      expect(categorised.event_type).to eq("NOTIFY_TOKENISATION_STATUS")
+    end
+
+    it "is nil when the payload named none" do
+      expect(result.event_type).to be_nil
+    end
+
+    it "is masked like every other payload-derived field (FR-011)" do
+      leaky = described_class.new(
+        transaction_id: "txn_1", transaction: record,
+        event_type: "NOTIFY #{WebhooksHelpers::PAN}"
+      )
+
+      expect(leaky.event_type).not_to include(WebhooksHelpers::PAN)
+      expect(leaky.event_type).to include("[FILTERED]")
     end
   end
 

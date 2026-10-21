@@ -112,6 +112,49 @@ RSpec.describe "BMLConnect::Webhooks#handle with a router" do
     expect(returned).to be_a(BMLConnect::Models::StatusChangeResult)
   end
 
+  # BML's portal registers a hook per event category, and the categories mean
+  # different things: a transaction-state change and a tokenisation outcome
+  # cannot share a handler. The resolver gets the whole result, so routing on
+  # the category needs nothing from this class but the field.
+  describe "routing on the payload's event category" do
+    def dispatch(body)
+      routed = nil
+      router = BMLConnect::Webhooks::Router.new
+      router.resolve { |r| r.event_type.to_s.match?(/tokeni[sz]ation/i) ? :tokenisation : :transaction }
+      router.on(:tokenisation) { |r| routed = [:tokenisation, r.event_type] }
+      router.on(:transaction) { |r| routed = [:transaction, r.event_type] }
+
+      webhooks.handle(body: body, router: router)
+      routed
+    end
+
+    it "hands a tokenisation notification to its own handler" do
+      expect(dispatch('{"transactionId":"txn_1","eventType":"NOTIFY_TOKENISATION_STATUS"}'))
+        .to eq([:tokenisation, "NOTIFY_TOKENISATION_STATUS"])
+    end
+
+    it "hands a transaction change to the other" do
+      expect(dispatch('{"transactionId":"txn_1","eventType":"NOTIFY_TRANSACTION_CHANGE"}'))
+        .to eq([:transaction, "NOTIFY_TRANSACTION_CHANGE"])
+    end
+
+    it "falls back to webhookType, the other key a live delivery carried" do
+      expect(dispatch('{"transactionId":"txn_1","webhookType":"TOKENIZATION"}'))
+        .to eq([:tokenisation, "TOKENIZATION"])
+    end
+
+    it "routes a delivery that names no category at all" do
+      expect(dispatch('{"transactionId":"txn_1"}')).to eq([:transaction, nil])
+    end
+
+    # The category decides WHICH handler, never WHAT it believes.
+    it "verifies by retrieve whichever category the payload claimed" do
+      dispatch('{"transactionId":"txn_1","eventType":"NOTIFY_TOKENISATION_STATUS"}')
+
+      expect(client.transactions).to have_received(:retrieve).with("txn_1", retries: false)
+    end
+  end
+
   # The router must not become a way to trust the payload.
   it "still retrieves from the gateway before dispatching" do
     router = BMLConnect::Webhooks::Router.new

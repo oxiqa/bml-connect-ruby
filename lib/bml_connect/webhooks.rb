@@ -74,6 +74,19 @@ module BMLConnect
     # +status+ is the common alternative in callback payloads generally.
     STATUS_CANDIDATES = %i[state status].freeze
 
+    # Candidate field names for the payload's EVENT CATEGORY, in resolution
+    # order. All [UNVERIFIED]: the published document describes how a hook is
+    # REGISTERED and says nothing about categories, yet BML's portal offers
+    # them per hook ("Transaction change", "Tokenisation status") and a live
+    # delivery named one in +eventType+ ("NOTIFY_TRANSACTION_CHANGE", observed
+    # 2026-10-21). +webhookType+ is read next because the same delivery
+    # carried that key too, holding null.
+    #
+    # Read for ROUTING ONLY and never reported as a fact — see
+    # Models::StatusChangeResult#event_type. A category cannot shorten the
+    # verify-by-retrieve path, and there is no option by which it could.
+    EVENT_TYPE_CANDIDATES = %i[eventType webhookType event_type type].freeze
+
     FORM_MEDIA_TYPE = "application/x-www-form-urlencoded"
     JSON_MEDIA_TYPE = "application/json"
 
@@ -125,7 +138,7 @@ module BMLConnect
       verify_secret!(presented_secret, actor: actor, raw_body: body)
       payload = parse_body!(body, normalized, actor: actor)
       transaction_id = extract_identifier!(payload, normalized, extract_id, actor: actor, raw_body: body)
-      claimed = first_string(payload, STATUS_CANDIDATES)
+      claimed, event = payload_hints(payload)
 
       record = retrieve!(transaction_id, actor: actor, raw_body: body, claimed: claimed)
       rechecked = false
@@ -136,7 +149,7 @@ module BMLConnect
         rechecked = true
       end
 
-      result = build_result(transaction_id, record, claimed, rechecked)
+      result = build_result(transaction_id, record, claimed, event, rechecked)
       audit(:success, actor: actor, raw_body: body, result: result)
 
       router ? router.dispatch(result) : result
@@ -145,6 +158,13 @@ module BMLConnect
     private
 
     attr_reader :client
+
+    # The two payload-derived values this class reads beyond the identifier:
+    # what the delivery CLAIMS the status is, and which category it says it
+    # belongs to. Neither can shorten or skip the verifying retrieve.
+    def payload_hints(payload)
+      [first_string(payload, STATUS_CANDIDATES), first_string(payload, EVENT_TYPE_CANDIDATES)]
+    end
 
     # --- the wait ----------------------------------------------------------
 
@@ -377,11 +397,12 @@ module BMLConnect
 
     # --- results, errors, auditing ----------------------------------------
 
-    def build_result(transaction_id, record, claimed, rechecked)
+    def build_result(transaction_id, record, claimed, event, rechecked)
       Models::StatusChangeResult.new(
         transaction_id: transaction_id,
         transaction: record,
         claimed_status: claimed,
+        event_type: event,
         disagreed: disagreement?(claimed, record.state),
         rechecked: rechecked,
         advisory_http_status: ADVISORY_ACCEPTED
@@ -419,6 +440,7 @@ module BMLConnect
       subject = {
         transaction_id: result ? result.transaction_id : transaction_id,
         claimed_status: result ? result.claimed_status : claimed,
+        event_type: result&.event_type,
         disagreed: result ? result.disagreed? : nil,
         rechecked: result ? result.rechecked? : nil,
         advisory_http_status: result ? result.advisory_http_status : advisory,
