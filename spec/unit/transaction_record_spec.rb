@@ -118,6 +118,34 @@ RSpec.describe BMLConnect::Models::TransactionRecord do
   # tokenization this library never asked for look identical once the
   # transaction is confirmed, and #tokenized? cannot tell them apart: it reads
   # the request we sent, which BML echoes back either way.
+  describe "#next_action" do
+    it "carries the 3DS challenge URL when the gateway demands one" do
+      record = described_class.new(id: "txn_1", nextAction: "https://3ds.bml/challenge/abc")
+
+      expect(record.next_action).to eq("https://3ds.bml/challenge/abc")
+    end
+
+    it "is nil when no challenge is required" do
+      expect(described_class.new(id: "txn_1").next_action).to be_nil
+    end
+
+    it "is not the hosted payment URL, and does not stand in for it" do
+      record = described_class.new(id: "txn_1", url: "https://pay.bml/A",
+                                   nextAction: "https://3ds.bml/challenge/abc")
+
+      expect(record.payment_url).to eq("https://pay.bml/A")
+      expect(record.next_action).to eq("https://3ds.bml/challenge/abc")
+    end
+
+    # A URL that completes a payment, held to the same rule as `url` (FR-015).
+    it "never appears in a whitelisted view" do
+      record = described_class.new(id: "txn_1", nextAction: "https://3ds.bml/challenge/abc")
+
+      expect(record.to_h.keys).to eq(described_class::ATTRIBUTES)
+      expect(record.inspect).not_to include("3ds.bml")
+    end
+  end
+
   describe "#tokenization_report" do
     it "is empty when BML said nothing at all about the card" do
       expect(described_class.new(id: "txn_1").tokenization_report).to eq({})

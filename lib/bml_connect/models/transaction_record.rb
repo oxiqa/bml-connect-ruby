@@ -28,6 +28,10 @@ module BMLConnect
       # reachable only through the explicit #payment_url accessor.
       PAYMENT_URL_KEYS = %i[url redirectUrl].freeze
 
+      # Not whitelisted, for the same reason `url` is not: it completes a
+      # payment. Reachable only through #next_action.
+      CHALLENGE_KEY = :nextAction
+
       # Fields in which BML reports what it DID about tokenization, as opposed
       # to +tokenizationDetails+, which is the request WE sent and which BML
       # echoes back — an echo says only that we asked. `tokenize` and
@@ -69,6 +73,12 @@ module BMLConnect
         end
 
         candidate
+      end
+
+      # BML's Transaction schema: "Returns a URL when 3DS authentication is
+      # required; this URL must be opened to complete the 3DS challenge."
+      def next_action
+        presence(@source[CHALLENGE_KEY])
       end
 
       # Whether the gateway kept the card. It echoes `tokenizationDetails` back
@@ -158,7 +168,8 @@ module BMLConnect
       # (whitelist, plus the payment-URL candidates and the tokenization
       # diagnostics).
       def normalize(source)
-        (ATTRIBUTES + PAYMENT_URL_KEYS + TOKENIZATION_FIELDS).each_with_object({}) do |key, hash|
+        keys = ATTRIBUTES + PAYMENT_URL_KEYS + TOKENIZATION_FIELDS + [CHALLENGE_KEY]
+        keys.each_with_object({}) do |key, hash|
           hash[key] = source.key?(key) ? source[key] : source[key.to_s]
         end
       end
