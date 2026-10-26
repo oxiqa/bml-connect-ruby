@@ -1,8 +1,6 @@
 ## [Unreleased]
 
-Carried by version string `0.3.0.pre.1` — a prerelease marker, not a published release. It exists so
-a consumer can tell at a glance that it is not running the published `0.2.0`. Drop the suffix when
-this is cut for real.
+## [0.3.0] - 2026-10-26
 
 Release gates, as of 2026-10-26, all observed in BML UAT through `msgowl/website`:
 
@@ -75,7 +73,7 @@ Release gates, as of 2026-10-26, all observed in BML UAT through `msgowl/website
 - BML's own error text is now masked before it becomes an exception message, so a card-like value in
   an upstream error body cannot reach a log or an error message. Applies to every resource.
 
-### Added (earlier, unreleased)
+### Added (earlier)
 - **Stored-card charge** (`client.customers.charge`), implementing feature `004-token-charge` on
   the documented `POST /public-customers/charge` endpoint. Takes `customer_id:`, `transaction_id:`
   and `token_id:` (all required, validated locally by name before any remote call) plus an optional
