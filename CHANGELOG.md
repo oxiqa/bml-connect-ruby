@@ -1,10 +1,23 @@
 ## [Unreleased]
 
 Carried by version string `0.3.0.pre.1` — a prerelease marker, not a published release. It exists so
-a consumer can tell at a glance that it is not running the published `0.2.0`, and the `.pre` suffix
-records that the release gates below (the `tokenId` identity, the v2 payment-URL field, the webhook
-identifier field, and the absence of any live token/charge observation) are still open. Drop the
-suffix when they close and this is cut for real.
+a consumer can tell at a glance that it is not running the published `0.2.0`. Drop the suffix when
+this is cut for real.
+
+Release gates, as of 2026-10-26, all observed in BML UAT through `msgowl/website`:
+
+- **Closed — `tokenId` identity.** `token_id` takes `Token#id`. Charges made that way returned
+  `CONFIRMED` (2026-10-21 onward; see `docs/website/research/bml-saved-card-adhoc-charge.md`).
+- **Closed — webhook identifier field.** Every delivery carries a top-level `transactionId`, the first
+  built-in candidate, for both `NOTIFY_TRANSACTION_CHANGE` and `NOTIFY_TOKENISATION_STATUS`
+  (2026-10-21/22). No `extract_id:` override is needed.
+- **Closed — live token and charge observation.** Customers, token listing, tokenizing transactions,
+  stored-card charges and webhook verification have all run end to end in UAT.
+- **Works, key not pinned — v2 payment URL.** Hosted-page redirects from `create_v2` work in UAT
+  through the `url` / `redirectUrl` / `qr.url` fallback, but which of them BML populates has not been
+  recorded.
+- **Still unobserved** — a declined charge, a charge returning `nextAction`, and a charge whose outcome
+  never arrives. These are handled against the published contract only.
 
 ### Added
 - **Webhook dispatch** (`BMLConnect::Webhooks::Router`, and a `router:` keyword on
@@ -46,10 +59,9 @@ suffix when they close and this is cut for real.
     attempt, and an operator needs to see it.
   - **No state enumeration, no deduplication, no body-size limit** — the published contract defines
     no states, the gem owns no datastore, and it does not own the socket.
-  - **⚠️ Release-blocked**: which inbound field carries the transaction identifier has not been
-    observed against UAT (`transactionId`, `transaction_id`, `id` are inferences). A wrong guess
-    fails loudly rather than reporting a false status, and `extract_id:` overrides the list outright.
-    See `specs/005-webhook-handler/contracts/bml-remote.md` for the observation procedure.
+  - **Identifier field observed**: UAT deliveries carry a top-level `transactionId`, the first
+    built-in candidate. A wrong guess still fails loudly rather than reporting a false status, and
+    `extract_id:` still overrides the list outright.
 - `BMLConnect::WebhookRejectedError` — raised when an inbound notification fails the optional
   shared-secret check. A distinct class so a security rejection stays observably separate from a
   malformed body.
@@ -78,9 +90,8 @@ suffix when they close and this is cut for real.
     `state`) is a business outcome; a raised error is a transport/validation outcome.
   - **Audits failures too** (success, decline, validation failure, availability failure), masked and
     carrying the transaction and token ids but never card data.
-  - **⚠️ Release-blocked**: whether `token_id` expects `Token#id` or `Token#token` is not yet
-    confirmed against a live environment (`Token#id` is the documented inference). An opt-in UAT
-    spec (`spec/integration/customers_charge_uat_spec.rb`) carries the resolution procedure.
+  - **`token_id` is `Token#id`**, confirmed in UAT: charges against `Token#id` return `CONFIRMED`.
+    The opt-in UAT spec (`spec/integration/customers_charge_uat_spec.rb`) still exercises it.
 - **Transactions v2 surface**, implementing feature `003-transactions-v2` on the shared `Resource`
   transport — **additive**, no released method changed. New value-object methods `create_v2`,
   `retrieve`, `update`, `capture` and `cancel` target the documented `/public/v2/transactions` and

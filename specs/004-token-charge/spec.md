@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-07
 
-**Status**: Draft — **BLOCKED on an unresolved identifier question, see Dependencies**
+**Status**: Implemented — `token_id` confirmed as `Token#id` in BML UAT 2026-10-21; decline path unobserved
 
 **Input**: New. The retired `bml_tokenization` specs had **no equivalent** — they modelled a
 stored-card charge as a `card_reference` parameter on transaction create, a shape that does not

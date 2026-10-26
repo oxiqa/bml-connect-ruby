@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-21
 
-**Status**: Draft — **one narrow observation outstanding, see Dependencies**
+**Status**: Implemented — identifier field observed in BML UAT 2026-10-22 (top-level `transactionId`)
 
 **Input**: User description: "Add webhook handler for transaction status changes"
 

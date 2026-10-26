@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-07
 
-**Status**: Draft
+**Status**: Implemented — verified in BML UAT 2026-10-21
 
 **Input**: Realigned from `bml_tokenization/specs/001-customer-api-endpoints` against BML's
 published contract, `reference/Connect-API.json` (OpenAPI 3.1, Connect API v2.0). See

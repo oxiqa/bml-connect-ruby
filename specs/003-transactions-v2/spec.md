@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-07
 
-**Status**: Draft
+**Status**: Implemented — verified in BML UAT 2026-10-21; which response key carries the hosted payment URL is not yet recorded
 
 **Input**: Realigned from `bml_tokenization/specs/003-transaction-endpoints` against
 `reference/Connect-API.json`. Unlike features `001`, `002` and `004`, this feature modifies an

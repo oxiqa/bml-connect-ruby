@@ -3,13 +3,13 @@
 Ruby gem for the Bank of Maldives Connect API
 
 Use this gem to interact with your Bank of Maldives Connect API:
-- 💳 __Transactions__
+- 💳 __Transactions__ (v1, and v2 with tokenization)
 - 👤 __Customers__
-
-**Planned** — specified against BML's published contract, not yet implemented. See
-[Roadmap](#roadmap):
 - 🔐 __Stored card tokens__
 - 🔁 __Charging a stored card__
+- 📬 __Transaction-status webhooks__
+
+See [Roadmap](#roadmap) for what has been verified against BML UAT.
 
 
 ## Installation
@@ -239,9 +239,7 @@ Notes:
 - **Audited, failures included.** Every charge emits a masked audit line — success, decline,
   validation failure, and availability failure alike — carrying the transaction and token ids and
   never any card data.
-- **⚠️ Release-blocked.** It is not yet confirmed against a live environment whether `token_id`
-  expects `Token#id` or `Token#token`. `Token#id` is the current inference; do not rely on this in
-  production until it is verified (see `specs/004-token-charge/`).
+- **`token_id` is `Token#id`.** Confirmed in BML UAT: a charge against `Token#id` returns `CONFIRMED`.
 
 ### Receiving transaction-status webhooks
 
@@ -366,8 +364,8 @@ BML.client.transactions.retrieve(transaction_id).state
 #### When the built-in field names are wrong
 
 The identifier is looked for under `transactionId`, `transaction_id`, then `id` (top-level keys only).
-All three are **inferences** from the published document, not observed facts. If you have seen your
-own deliveries and know the real field, say so and the library will not second-guess you:
+BML UAT deliveries carry `transactionId`, so the defaults work. If your deliveries differ, say so and
+the library will not second-guess you:
 
 ```ruby
 BML.client.webhooks.handle(
@@ -384,17 +382,15 @@ Bodies are accepted as JSON or form-encoded, selected by `Content-Type` (with a 
 when it is absent). Header names are normalized for you, so `request.env`, `request.headers`, and a
 plain hash all work.
 
-> **⚠️ Not release-verified.** Which inbound field carries the transaction identifier has not been
-> observed against UAT, so every built-in candidate is `[UNVERIFIED]`. A wrong guess fails loudly
-> rather than reporting a false status, and `extract_id:` bypasses the list — but confirm it against a
-> real delivery before relying on the defaults. See
-> [`specs/005-webhook-handler/`](specs/005-webhook-handler/).
+> **Observed in UAT.** `NOTIFY_TRANSACTION_CHANGE` and `NOTIFY_TOKENISATION_STATUS` deliveries both
+> carry a top-level `transactionId`. A wrong guess would still fail loudly rather than report a false
+> status. See [`specs/005-webhook-handler/`](specs/005-webhook-handler/).
 
 ## Roadmap
 
-Tokenization support is moving into this gem. It was previously being built as a separate
+Tokenization support lives in this gem. It was previously being built as a separate
 `bml_tokenization` gem, which turned out to have been specified against an assumed API contract
-that does not match BML's published one — see [MIGRATION.md](MIGRATION.md) for the full account.
+that does not match BML's published one.
 
 Work is now spec-driven against BML's own OpenAPI document, vendored at
 [`reference/Connect-API.json`](reference/Connect-API.json). Where this library and that document
@@ -402,11 +398,11 @@ disagree, the document wins.
 
 | Feature | Endpoints | Status |
 |---|---|---|
-| [`001-customers-endpoints`](specs/001-customers-endpoints/) | `/public-customers` | Implemented (pending live UAT verification) |
-| [`002-stored-card-tokens`](specs/002-stored-card-tokens/) | `/public-customers/{id}/tokens` | Implemented (pending live UAT verification) |
-| [`003-transactions-v2`](specs/003-transactions-v2/) | `/public/v2/transactions` | Specified |
-| [`004-token-charge`](specs/004-token-charge/) | `/public-customers/charge` | Implemented, release-blocked (pending live UAT: `tokenId` identity) |
-| [`005-webhook-handler`](specs/005-webhook-handler/) | inbound callback + `/public/transactions/{id}` | Implemented, release-blocked (pending live UAT: which field carries the transaction id) |
+| [`001-customers-endpoints`](specs/001-customers-endpoints/) | `/public-customers` | Implemented, verified in UAT |
+| [`002-stored-card-tokens`](specs/002-stored-card-tokens/) | `/public-customers/{id}/tokens` | Implemented, verified in UAT |
+| [`003-transactions-v2`](specs/003-transactions-v2/) | `/public/v2/transactions` | Implemented, verified in UAT (payment-URL key not pinned) |
+| [`004-token-charge`](specs/004-token-charge/) | `/public-customers/charge` | Implemented, verified in UAT (decline path unobserved) |
+| [`005-webhook-handler`](specs/005-webhook-handler/) | inbound callback + `/public/transactions/{id}` | Implemented, verified in UAT |
 
 Each feature directory carries a `spec.md`, `plan.md`, `research.md`, `data-model.md`, `tasks.md`
 and two contracts — one for the BML HTTP surface, one for the Ruby surface this gem exposes.

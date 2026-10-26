@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-07
 
-**Status**: Draft
+**Status**: Implemented — verified in BML UAT 2026-10-21
 
 **Input**: Merged and realigned from `bml_tokenization/specs/002-card-on-file-endpoints` and
 `bml_tokenization/specs/004-tokenization-endpoints` against `reference/Connect-API.json`. See
