@@ -5,7 +5,7 @@
 Release gates, as of 2026-10-26, all observed in BML UAT through `msgowl/website`:
 
 - **Closed — `tokenId` identity.** `token_id` takes `Token#id`. Charges made that way returned
-  `CONFIRMED` (2026-10-21 onward; see `docs/website/research/bml-saved-card-adhoc-charge.md`).
+  `CONFIRMED` (2026-10-21 onward; see `agent-docs/website/research/bml-saved-card-adhoc-charge.md`).
 - **Closed — webhook identifier field.** Every delivery carries a top-level `transactionId`, the first
   built-in candidate, for both `NOTIFY_TRANSACTION_CHANGE` and `NOTIFY_TOKENISATION_STATUS`
   (2026-10-21/22). No `extract_id:` override is needed.
